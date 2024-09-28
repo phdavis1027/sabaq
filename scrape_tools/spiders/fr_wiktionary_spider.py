@@ -1,4 +1,4 @@
-import time
+import unicodedata
 
 import scrapy
 
@@ -7,7 +7,6 @@ import git
 from bs4 import BeautifulSoup as bs
 
 # TODO: Add a pipeline step that applies unicode normalization
-
 
 IDIOTISMES_ANIMALIERS = 'https://fr.wiktionary.org/wiki/Cat%C3%A9gorie:Idiotismes_animaliers_en_fran%C3%A7ais'
 IDIOTISMES_DEMONYMES = 'https://fr.wiktionary.org/wiki/Cat%C3%A9gorie:Idiotismes_avec_d%C3%A9monymes_en_fran%C3%A7ais'
@@ -54,8 +53,7 @@ class FrWiktionarySpider(scrapy.Spider):
 
     def __init__(self, category=None, *args, **kwargs):
         super(FrWiktionarySpider, self).__init__(*args, **kwargs)
-        run_id = f'{FrWiktionarySpider.name}-{time.time()}-{sha}'
-        self.run_id = run_id
+        self.run_id = kwargs['run_id']
 
     def start_requests(self):
         for url in urls:
@@ -83,13 +81,13 @@ class FrWiktionarySpider(scrapy.Spider):
         EXAMPLE_SELECTOR = 'span.example > q > bdi.lang-fr'
 
         for example in soup.select(EXAMPLE_SELECTOR):
-            examples.append(example.text)
+            example = example.get_text(separator=" ").strip()
+            example = unicodedata.normalize('NFKC', example)
+
+            examples.append(example)
 
         yield {
-            'collection': 'fr_wiktionary',
             'run': self.run_id,
-            'language': "fr",
-            'source': "wiktionary",
             'idiom': idiom,
             'examples': examples
         }

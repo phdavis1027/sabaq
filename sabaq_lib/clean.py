@@ -90,6 +90,9 @@ if __name__ == '__main__':
 
             
     for ex, tag in key.items():
+
+        db['training'].insert_one({'ex': ex, 'tag': tag})
+
         for c in ex: 
             print('{0:8}'.format(c), end='')
 

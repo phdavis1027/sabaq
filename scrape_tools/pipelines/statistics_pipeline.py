@@ -10,7 +10,6 @@ class StatisticsPipeline:
         sha = repo.head.object.hexsha
 
         self.stats = {
-            'run_id': f'{spider.name}-{time.time()}-{sha}',
             'unique_idioms': 0,
             'total_examples': 0,
             'avg_examples_per_idiom': 0,

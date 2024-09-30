@@ -1,27 +1,45 @@
 # stdlib
 import random
+import warnings
+import time
+import os
 
 # 3rd party
 import pymongo
 
-from datasets import DatasetDict, Dataset
+from transformers import (
+    DataCollatorForTokenClassification,
+    AutoModelForTokenClassification,
+    CamembertTokenizerFast,
+    CamembertForTokenClassification,
+    TrainingArguments,
+    Trainer,
+)
+
 import datasets
+from datasets import DatasetDict, Dataset, load_metric
+
 import numpy as np
-from transformers import BertTokenizerFast
-from transformers import DataCollatorForTokenClassification
-from transformers import AutoModelForTokenClassification
+
 from sklearn.metrics import classification_report
-from datasets import DatasetDict, Dataset
-from transformers import TrainingArguments, Trainer
-import torch
+
 import matplotlib.pyplot as plt
+
 import torch
-from transformers import BertTokenizer, BertModel
-import numpy as np
+
+from googletrans import Translator
+
+from nltk.translate import meteor_score
+import nltk
 
 from sklearn.metrics.pairwise import cosine_similarity
 
 import spacy
+import spacy.util as spacy_util
+
+# local
+
+import util
 
 
 def load_data():
@@ -69,7 +87,9 @@ test = Dataset.from_dict(
 
 dataset_dict = DatasetDict({"train": train, "validation": validation, "test": test})
 
-tokenizer = BertTokenizerFast.from_pretrained("bert-base-uncased")
+tokenizer = CamembertTokenizerFast.from_pretrained(
+    "camembert/camembert-base-wikipedia-4gb"
+)
 
 
 def tokenize_and_align_inputs(examples, label_all_tokens=True):
@@ -100,8 +120,8 @@ torch.manual_seed(42)
 
 tokenized_datasets = dataset_dict.map(tokenize_and_align_inputs, batched=True)
 
-model = AutoModelForTokenClassification.from_pretrained(
-    "bert-base-uncased", num_labels=2
+model = CamembertForTokenClassification.from_pretrained(
+    "camembert/camembert-base-wikipedia-4gb", num_labels=2
 )
 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -147,7 +167,17 @@ def compute_metrics(preds):
     }
 
 
-nlp = spacy.load("fr_deps_news_trf")
+spacy_model = "fr_dep_news_trf"
+
+spacy_model_path = os.path.join(util.find_path_to_site_packages(), spacy_model)
+
+version = spacy_util.get_package_version(spacy_model)
+
+package = f"{spacy_model}-{version}"
+
+spacy_model_path = os.path.join(spacy_model_path, package)
+
+nlp = spacy.load(spacy_model_path)
 
 
 def get_bert_embedding(text, model, tokenizer):
@@ -244,3 +274,112 @@ def calculate_cohesion_score(context_words, idiom_words, model, tokenizer):
                 return "literal", connectivity, connectivity_without_idiom
         else:
             return "idiom", 0, 0
+
+
+def idiom_part(ip_ids, labels):
+    idiom = []
+    for i, l in enumerate(labels):
+        if l == 1:
+            idiom.append(ip_ids[i])
+
+    return (
+        tokenizer.decode(ip_ids.view(-1))
+        .replace("[CLS]", "")
+        .replace("[SEP]", "")
+        .split(),
+        tokenizer.decode(idiom_list).split(),
+    )
+
+
+def meteor(sen, max_retries=3, timeout_seconds=10):
+    for retry in range(max_retries):
+        try:
+            translated_text = translator.translate(
+                sen, dest="hi", timeout=timeout_seconds
+            ).text
+            back_translated_text = translator.translate(
+                translated_text, dest="fr", timeout=timeout_seconds
+            ).text
+            bsen = back_translated_text
+            r = [sen.split()]
+            c = bsen.split()
+            meteor_score_value = meteor_score.meteor_score(r, c)
+
+            return meteor_score_value, sen, bsen
+        except Exception as e:
+            print(
+                f"An error occurred during translation (Retry {retry + 1}/{max_retries}): {e}"
+            )
+            time.sleep(1)
+
+    print(f"Failed to translate after {max_retries} retries.")
+    return 0, None, None
+
+
+nltk.download("wordnet")
+translator = Translator()
+
+
+class IdiomRecognitionTrainer(Trainer):
+    def compute_loss(self, model, inputs, return_outputs=False):
+        ip_ids = inputs["input_ids"]
+        labels = inputs.pop("labels")
+
+        b = 0
+        a = 0
+        c = 0
+
+        m, n = idiom_part(ip_ids, labels)
+
+        if len(n) != 0:
+            c, a, b = calculate_cohesion_score(m, n, model_1, tokenizer_1)
+
+        x = " ".join(m)
+
+        y, i, j = meteor(x)
+
+        outputs = model(**inputs)
+        logits = outputs.logits
+
+        loss = torch.nn.functional.cross_entropy(
+            logits.view(-1, logits.shape[-1]), labels.view(-1), ignore_index=-100
+        )
+
+        if y < 0.7:
+            loss = loss * 100
+
+        if b - a > 0.02:
+            loss = loss * 100
+
+        if return_outputs:
+            return loss, outputs
+        else:
+            return loss
+
+
+args = TrainingArguments(
+    "test-idiom-recognition",
+    evaluation_strategy="epoch",
+    learning_rate=2e-5,
+    per_device_train_batch_size=1,
+    per_device_eval_batch_size=1,
+    num_train_epochs=3,
+    weight_decay=0.01,
+    seed=42,
+)
+
+trainer = IdiomRecognitionTrainer(
+    model=model,
+    args=args,
+    train_dataset=tokenized_datasets["train"],
+    eval_dataset=tokenized_datasets["validation"],
+    data_collator=data_collator,
+    tokenizer=tokenizer,
+    compute_metrics=compute_metrics,
+)
+
+np.seterr(all="ignore")
+
+warnings.filterwarnings("ignore", categogy=RuntimeError)
+
+trainer.train()

@@ -167,17 +167,9 @@ def compute_metrics(preds):
     }
 
 
-spacy_model = "fr_dep_news_trf"
+nlp = util.load_spacy_model("fr_dep_news_trf")
 
-spacy_model_path = os.path.join(util.find_path_to_site_packages(), spacy_model)
-
-version = spacy_util.get_package_version(spacy_model)
-
-package = f"{spacy_model}-{version}"
-
-spacy_model_path = os.path.join(spacy_model_path, package)
-
-nlp = spacy.load(spacy_model_path)
+print("loaded spacy model")
 
 
 def get_bert_embedding(text, model, tokenizer):

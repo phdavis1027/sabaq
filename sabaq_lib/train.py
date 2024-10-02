@@ -50,6 +50,9 @@ def load_data():
     return collection.find()
 
 
+model_name = "camembert/camembert-base-wikipedia-4gb"
+bundle = util.BaseModelBundle(model_name, "seqeval")
+
 combined_data = [(it["ex"], it["tag"]) for it in load_data()]
 
 total_samples = len(combined_data)
@@ -87,10 +90,6 @@ test = Dataset.from_dict(
 
 dataset_dict = DatasetDict({"train": train, "validation": validation, "test": test})
 
-tokenizer = CamembertTokenizerFast.from_pretrained(
-    "camembert/camembert-base-wikipedia-4gb"
-)
-
 
 def tokenize_and_align_inputs(examples, label_all_tokens=True):
     tokenized_inputs = tokenizer(
@@ -120,56 +119,13 @@ torch.manual_seed(42)
 
 tokenized_datasets = dataset_dict.map(tokenize_and_align_inputs, batched=True)
 
-model = CamembertForTokenClassification.from_pretrained(
-    "camembert/camembert-base-wikipedia-4gb", num_labels=2
-)
-
-device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-model.to(device)
-
-data_collator = DataCollatorForTokenClassification(tokenizer)
-
-metric = datasets.load_metric("seqeval")
-
 label_list = ["O", "I"]
-
-
-def compute_metrics(preds):
-    pred_logits, labels = preds
-
-    pred_logits = np.argmax(pred_logits, axis=2)
-
-    # Remove ignored index (special tokens)
-    predictions = [
-        [label_list[p] for (p, l) in zip(prediction, label) if l != -100]
-        for prediction, label in zip(pred_logits, labels)
-    ]
-
-    true_labels = [
-        [label_list[l] for (_, l) in zip(prediction, label) if l != -100]
-        for prediction, label in zip(pred_logits, labels)
-    ]
-
-    flat_predictions = [label for sublist in predictions for label in sublist]
-    flat_true_labels = [label for sublist in true_labels for label in sublist]
-
-    report = classification_report(flat_true_labels, flat_predictions, digits=4)
-
-    print(report)
-
-    results = metric.compute(predictions=predictions, references=true_labels)
-
-    return {
-        "precision": results["overall_precision"],
-        "recall": results["overall_recall"],
-        "f1": results["overall_f1"],
-        "accuracy": results["overall_accuracy"],
-    }
-
 
 nlp = util.load_spacy_model("fr_dep_news_trf")
 
 print("loaded spacy model")
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def get_bert_embedding(text, model, tokenizer):
@@ -190,11 +146,12 @@ def compute_semantic_relatedness(embedding1, embedding2):
 def filter_pos(text, pos_tags_to_keep):
     filtered_words = []
 
-    doc = nlp(text)
+    for word in text:
+        for token in nlp(word):
+            if token.pos_ in pos_tags_to_keep:
+                filtered_words.append(token.text)
 
-    for token in doc:
-        if token.pos_ in pos_tags_to_keep:
-            filtered_words.append(token.text)
+    return filtered_words
 
 
 def calculate_cohesion_score(context_words, idiom_words, model, tokenizer):
@@ -270,16 +227,16 @@ def calculate_cohesion_score(context_words, idiom_words, model, tokenizer):
 
 def idiom_part(ip_ids, labels):
     idiom = []
-    for i, l in enumerate(labels):
+    for i, l in enumerate(labels.view(-1)):
         if l == 1:
-            idiom.append(ip_ids[i])
+            idiom.append(ip_ids.view(-1)[i])
 
     return (
         tokenizer.decode(ip_ids.view(-1))
         .replace("[CLS]", "")
         .replace("[SEP]", "")
         .split(),
-        tokenizer.decode(idiom_list).split(),
+        tokenizer.decode(idiom).split(),
     )
 
 
@@ -311,6 +268,10 @@ def meteor(sen, max_retries=3, timeout_seconds=10):
 nltk.download("wordnet")
 translator = Translator()
 
+backup_bundle = util.BaseModelBundle(
+    "camembert/camembert-base-wikipedia-4gb", "seqeval"
+)
+
 
 class IdiomRecognitionTrainer(Trainer):
     def compute_loss(self, model, inputs, return_outputs=False):
@@ -324,7 +285,13 @@ class IdiomRecognitionTrainer(Trainer):
         m, n = idiom_part(ip_ids, labels)
 
         if len(n) != 0:
-            c, a, b = calculate_cohesion_score(m, n, model_1, tokenizer_1)
+            thing = calculate_cohesion_score(
+                m, n, backup_bundle.model, backup_bundle.tokenizer
+            )
+            print("NOTICE ME")
+            print(thing)
+            print("NOTICE ME")
+            c, a, b = thing
 
         x = " ".join(m)
 
@@ -360,18 +327,49 @@ args = TrainingArguments(
     seed=42,
 )
 
+
+def compute_metrics(preds, metric: datasets.Metric) -> dict:
+    pred_logits, labels = preds
+
+    pred_logits = np.argmax(pred_logits, axis=2)
+
+    # Remove ignored index (special tokens)
+    predictions = [
+        [label_list[p] for (p, l) in zip(prediction, label) if l != -100]
+        for prediction, label in zip(pred_logits, labels)
+    ]
+
+    true_labels = [
+        [label_list[l] for (_, l) in zip(prediction, label) if l != -100]
+        for prediction, label in zip(pred_logits, labels)
+    ]
+
+    flat_predictions = [label for sublist in predictions for label in sublist]
+    flat_true_labels = [label for sublist in true_labels for label in sublist]
+
+    report = classification_report(flat_true_labels, flat_predictions, digits=4)
+
+    print(report)
+
+    results = bundle.metric.compute(predictions=predictions, references=true_labels)
+
+    return {
+        "precision": results["overall_precision"],
+        "recall": results["overall_recall"],
+        "f1": results["overall_f1"],
+        "accuracy": results["overall_accuracy"],
+    }
+
+
 trainer = IdiomRecognitionTrainer(
-    model=model,
+    model=bundle.model,
     args=args,
     train_dataset=tokenized_datasets["train"],
     eval_dataset=tokenized_datasets["validation"],
-    data_collator=data_collator,
-    tokenizer=tokenizer,
+    data_collator=bundle.collator,
+    tokenizer=bundle.tokenizer,
     compute_metrics=compute_metrics,
 )
 
-np.seterr(all="ignore")
-
-warnings.filterwarnings("ignore", categogy=RuntimeError)
 
 trainer.train()

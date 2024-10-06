@@ -50,22 +50,13 @@ def load_spacy_model(model: str) -> SpacyLanguage:
 
 class BaseModelBundle:
     def __init__(self, model_name: str, metric: str) -> None:
-        print("loading model")
         model = AutoModelForTokenClassification.from_pretrained(
             model_name, num_labels=2
         )
-
-        print("loading tokenizer")
         tokenizer = AutoTokenizer.from_pretrained(model_name)
-
-        print("checking and setting device")
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model.to(device)
-
-        print("loading data collator")
         collator = DataCollatorForTokenClassification(tokenizer)
-
-        print("loading metric")
         metric = datasets.load_metric(metric)
 
         self.model = model

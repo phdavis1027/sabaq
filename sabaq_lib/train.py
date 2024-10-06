@@ -50,6 +50,8 @@ def load_data():
     return collection.find()
 
 
+# TODO: Next step is to create ONE reference model
+# that all different invocations of "model" refer to.
 model_name = "camembert/camembert-base-wikipedia-4gb"
 bundle = util.BaseModelBundle(model_name, "seqeval")
 
@@ -91,7 +93,7 @@ test = Dataset.from_dict(
 dataset_dict = DatasetDict({"train": train, "validation": validation, "test": test})
 
 
-def tokenize_and_align_inputs(examples, label_all_tokens=True):
+def tokenize_and_align_inputs(examples, tokenizer, label_all_tokens=True):
     tokenized_inputs = tokenizer(
         examples["tokens"], truncation=True, is_split_into_words=True
     )
@@ -99,8 +101,10 @@ def tokenize_and_align_inputs(examples, label_all_tokens=True):
     labels = []
     for i, label in enumerate(examples["tags"]):
         word_ids = tokenized_inputs.word_ids(batch_index=i)
+
         previous_word_idx = None
         label_ids = []
+
         for word_idx in word_ids:
             if word_idx is None:
                 label_ids.append(-100)
@@ -116,20 +120,24 @@ def tokenize_and_align_inputs(examples, label_all_tokens=True):
 
 
 torch.manual_seed(42)
-
-tokenized_datasets = dataset_dict.map(tokenize_and_align_inputs, batched=True)
+# TODO:  What is this pattern called?
+tokenize_and_align_inputs_with_bundle = lambda examples: tokenize_and_align_inputs(
+    examples, bundle.tokenizer
+)
+tokenized_datasets = dataset_dict.map(
+    tokenize_and_align_inputs_with_bundle, batched=True
+)
 
 label_list = ["O", "I"]
-
 nlp = util.load_spacy_model("fr_dep_news_trf")
-
-print("loaded spacy model")
-
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def get_bert_embedding(text, model, tokenizer):
     input_ids = tokenizer(text, return_tensors="pt").to(device)
+
+    print(f"[INFO input_ids] {type(input_ids)}")
+    print(input_ids)
 
     with torch.no_grad():
         model_output = model(input_ids)
@@ -225,7 +233,7 @@ def calculate_cohesion_score(context_words, idiom_words, model, tokenizer):
             return "idiom", 0, 0
 
 
-def idiom_part(ip_ids, labels):
+def idiom_part(ip_ids, labels, tokenizer):
     idiom = []
     for i, l in enumerate(labels.view(-1)):
         if l == 1:
@@ -282,16 +290,12 @@ class IdiomRecognitionTrainer(Trainer):
         a = 0
         c = 0
 
-        m, n = idiom_part(ip_ids, labels)
+        m, n = idiom_part(ip_ids, labels, self.tokenizer)
 
         if len(n) != 0:
-            thing = calculate_cohesion_score(
+            c, a, b = calculate_cohesion_score(
                 m, n, backup_bundle.model, backup_bundle.tokenizer
             )
-            print("NOTICE ME")
-            print(thing)
-            print("NOTICE ME")
-            c, a, b = thing
 
         x = " ".join(m)
 
@@ -351,7 +355,7 @@ def compute_metrics(preds, metric: datasets.Metric) -> dict:
 
     print(report)
 
-    results = bundle.metric.compute(predictions=predictions, references=true_labels)
+    results = metric.compute(predictions=predictions, references=true_labels)
 
     return {
         "precision": results["overall_precision"],
@@ -361,6 +365,7 @@ def compute_metrics(preds, metric: datasets.Metric) -> dict:
     }
 
 
+compute_metrics_with_bundle = lambda preds: compute_metrics(preds, bundle.metric)
 trainer = IdiomRecognitionTrainer(
     model=bundle.model,
     args=args,
@@ -368,7 +373,7 @@ trainer = IdiomRecognitionTrainer(
     eval_dataset=tokenized_datasets["validation"],
     data_collator=bundle.collator,
     tokenizer=bundle.tokenizer,
-    compute_metrics=compute_metrics,
+    compute_metrics=compute_metrics_with_bundle,
 )
 
 

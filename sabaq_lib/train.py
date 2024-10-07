@@ -5,7 +5,6 @@ import time
 import os
 
 # 3rd party
-import pymongo
 
 from transformers import (
     DataCollatorForTokenClassification,
@@ -42,18 +41,20 @@ import spacy.util as spacy_util
 import util
 
 
-def load_data():
-    client = pymongo.MongoClient("localhost", 27017)
-    db = client["sabaq"]
-    collection = db["training"]
-
-    return collection.find()
-
-
 # TODO: Next step is to create ONE reference model
 # that all different invocations of "model" refer to.
 model_name = "camembert/camembert-base-wikipedia-4gb"
 bundle = util.BaseModelBundle(model_name, "seqeval")
+
+# Text data is a list of lists
+# Tag data is a list of lists
+
+# combined_data = []
+# for it in load_data():
+#     print('[INFO load_data()]', it)
+#     combined_data.append((it['ex'], it['tag']))
+#
+# exit()
 
 combined_data = [(it["ex"], it["tag"]) for it in load_data()]
 
@@ -74,20 +75,37 @@ train_tokens, train_tags = zip(*train_data)
 val_tokens, val_tags = zip(*val_data)
 test_tokens, test_tags = zip(*test_data)
 
-print(f"Train: {len(train_data)} Val: {len(val_data)} Test: {len(test_data)}")
+print(f"[INFO train_tokens] {train_tokens[:2]}")
+print(f"[INFO train_tags] {train_tags[:2]}")
+print(f"[INFO val_tokens] {val_tokens[:2]}")
+print(f"[INFO val_tags] {val_tags[:2]}")
+print(f"[INFO test_tokens] {test_tokens[:2]}")
+print(f"[INFO test_tags] {test_tags[:2]}")
+
+exit()
 
 train = Dataset.from_dict(
     {
         "id": list(map(str, range(train_size))),
-        "tokens": train_tokens,
-        "tags": train_tags,
+        "tokens": list(train_tokens),
+        "tags": list(train_tags),
     }
 )
+
 validation = Dataset.from_dict(
-    {"id": list(map(str, range(val_size))), "tokens": val_tokens, "tags": val_tags}
+    {
+        "id": list(map(str, range(val_size))),
+        "tokens": list(val_tokens),
+        "tags": list(val_tags),
+    }
 )
+
 test = Dataset.from_dict(
-    {"id": list(map(str, range(test_size))), "tokens": test_tokens, "tags": test_tags}
+    {
+        "id": list(map(str, range(test_size))),
+        "tokens": list(test_tokens),
+        "tags": list(test_tags),
+    }
 )
 
 dataset_dict = DatasetDict({"train": train, "validation": validation, "test": test})

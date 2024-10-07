@@ -228,7 +228,11 @@ def calculate_cohesion_score(context_words, idiom_words, model, tokenizer, nlp, 
 
     connectivity = cohesion_graph.mean()
 
-    idiom_indices = [filtered_context_words.index(word) for word in idiom_words]
+    idiom_indices = [
+        filtered_context_words.index(word)
+        for word in idiom_words
+        if word in filtered_context_words
+    ]
 
     if idiom_indices:
         cohesion_graph = np.delete(cohesion_graph, idiom_indices, axis=0)
@@ -248,7 +252,7 @@ def calculate_cohesion_score(context_words, idiom_words, model, tokenizer, nlp, 
         word_embeddings = {}
 
         for word in filtered_context_words:
-            word_embeddings[word] = get_bert_embedding(word, model, tokenizer, model)
+            word_embeddings[word] = get_bert_embedding(word, model, tokenizer, device)
 
         for word1 in filtered_context_words:
             for word2 in filtered_context_words:

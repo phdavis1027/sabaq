@@ -197,7 +197,11 @@ def calculate_cohesion_score(context_words, idiom_words, model, tokenizer):
 
     connectivity = cohesion_graph.mean()
 
-    idiom_indices = [filtered_context_words.index(word) for word in idiom_words]
+    idiom_indices = [
+        filtered_context_words.index(word)
+        for word in idiom_words
+        if word in filtered_context_words
+    ]
 
     if idiom_indices:
         cohesion_graph = np.delete(cohesion_graph, idiom_indices, axis=0)

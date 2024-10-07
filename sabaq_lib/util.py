@@ -16,6 +16,8 @@ import spacy
 from spacy.language import Language as SpacyLanguage
 import spacy.util as spacy_util
 
+from sklearn.metrics import classification_report
+
 from transformers import (
     PreTrainedTokenizerFast,
     PreTrainedModel,
@@ -155,9 +157,31 @@ def load_training_data(
     return tokenized_datasets
 
 
+def idiom_part(ip_ids, labels, tokenizer):
+    idiom = []
+    for i, l in enumerate(labels.view(-1)):
+        if l == 1:
+            idiom.append(ip_ids.view(-1)[i])
+
+    return (
+        tokenizer.decode(ip_ids.view(-1))
+        .replace("[CLS]", "")
+        .replace("[SEP]", "")
+        .split(),
+        tokenizer.decode(idiom).split(),
+    )
+
+
 class IdiomRecognitionTrainer(Trainer):
     def compute_loss(self, model, inputs, return_outputs=False):
+        ip_ids = inputs["input_ids"]
         labels = inputs.pop("labels")
+
+        a = 0
+        b = 0
+        c = 0
+
+        m, n = idiom_part(ip_ids, labels, self.tokenizer)
 
         outputs = model(**inputs)
 

@@ -29,6 +29,8 @@ from transformers import (
     Trainer,
 )
 
+import numpy as np
+
 import datasets
 from datasets import Dataset, DatasetDict
 
@@ -76,7 +78,7 @@ class BaseModelBundle:
 class BackupModelBundle:
     def __init__(self, model_name: str, metric: str) -> None:
         model = AutoModel.from_pretrained(model_name)
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model.to(device)
 
@@ -172,7 +174,9 @@ def load_training_data(
 
 def get_bert_embedding(text, model, tokenizer, device):
     print("about to tokenize for bert")
-    input_ids = tokenizer(text, return_tensors="pt").to(device)
+
+    print("text", text)
+    input_ids = tokenizer.encode(text, return_tensors="pt").to(device)
     print("tokenized for bert")
 
     with torch.no_grad():
@@ -207,6 +211,8 @@ def calculate_cohesion_score(context_words, idiom_words, model, tokenizer, nlp, 
     print("Computing embeddings")
     for word in filtered_context_words:
         print(f"Computing embedding for {word}")
+        print("Model", model)
+        print("Tokenizer", tokenizer)
         word_embeddings[word] = get_bert_embedding(word, model, tokenizer, device)
 
     cohesion_graph = np.zeros(

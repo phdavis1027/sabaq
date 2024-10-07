@@ -16,6 +16,7 @@ from datasets import DatasetDict, Dataset, load_metric
 import util
 from util import (
     BaseModelBundle,
+    BackupModelBundle,
     IdiomRecognitionTrainer,
 )
 
@@ -40,7 +41,6 @@ label_list = [
     "O",
     "I",
 ]
-nlp = util.load_spacy_model("fr_dep_news_trf")
 
 
 def compute_metrics(preds, metric: datasets.Metric) -> dict:
@@ -72,9 +72,16 @@ def compute_metrics(preds, metric: datasets.Metric) -> dict:
 
 torch.manual_seed(42)
 
+backup_bundle = BackupModelBundle(*bundle_params)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 # TODO:  What is this pattern called?
 compute_metrics_with_instance = lambda p: compute_metrics(p, bundle.metric)
 trainer = IdiomRecognitionTrainer(
+    cohesion_model=backup_bundle.model,
+    cohesion_tokenizer=backup_bundle.tokenizer,
+    nlp=util.load_spacy_model("fr_dep_news_trf"),
+    device=device,
     model=bundle.model,
     args=args,
     train_dataset=tokenized_datasets["train"],

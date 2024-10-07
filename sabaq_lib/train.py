@@ -154,9 +154,6 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 def get_bert_embedding(text, model, tokenizer):
     input_ids = tokenizer(text, return_tensors="pt").to(device)
 
-    print(f"[INFO input_ids] {type(input_ids)}")
-    print(input_ids)
-
     with torch.no_grad():
         model_output = model(input_ids)
 

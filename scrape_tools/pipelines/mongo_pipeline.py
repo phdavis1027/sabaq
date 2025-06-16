@@ -11,7 +11,7 @@ class MongoPipeline:
     def from_crawler(cls, crawler):
         return cls(
             mongo_uri=crawler.settings.get('MONGO_URI'),
-            mongo_db=crawler.settings.get('MONGO_DB')
+            mongo_db=crawler.settings.get('MONGO_DB'),
         )
 
     def open_spider(self, spider):
@@ -24,12 +24,7 @@ class MongoPipeline:
     def process_item(self, item, spider):
         adapter = ItemAdapter(item)
 
-        collection = adapter['collection']
-
         out = adapter.asdict()
 
-        del out['collection']
-
-        self.db[collection].insert_one(out)
+        self.db['training ' + spider.name].insert_one(out)
         return item
-

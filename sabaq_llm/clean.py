@@ -29,7 +29,7 @@ if __name__ == "__main__":
     # Map to a list of idioms
     idioms = map(
         lambda x: nlp(unicodedata.normalize("NFKC", x["idiom"])),
-        db["fr_wiktionary"].find({}),
+        db["trianing_fr_wiktionary"].find({}),
     )
 
     # Lemmatize the idioms
@@ -89,7 +89,7 @@ if __name__ == "__main__":
     for ex, tag in key.items():
         assert (len(ex) == len(tag), "tag and example have different lengths")
 
-        db["training"].insert_one({"ex": ex, "tag": tag})
+        db["training_fr_wiktionary"].insert_one({"ex": ex, "tag": tag})
 
         for c in ex:
             print("{0:8}".format(c), end="")

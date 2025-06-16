@@ -1,5 +1,5 @@
 scrapy~=2.11.2
-spacy~=3.7.6
+spacy~=3.8.7
 beautifulsoup4~=4.10.0
 gitpython~=3.1.24
 pymongo~=4.9.1
@@ -7,8 +7,12 @@ datasets==2.16.1
 googletrans>=3.1.0a0
 transformers>=4.39.3
 nltk~=3.7
-torch~=2.1.2
+torch~=2.7.1
 scikit-learn>=1.0.2
 matplotlib~=3.9.2
 seqeval~=1.2.2
 accelerate>=0.26.0
+Django==5.2.3
+pgvector==0.4.1
+psycopg>=3.2.9
+PyPDF2~=3.0.1

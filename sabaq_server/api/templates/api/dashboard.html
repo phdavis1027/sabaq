@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sabaq - Dashboard</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f5f7fa;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 2rem;
+        }
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .logout-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: background 0.3s ease;
+        }
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        .main-content {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+        .welcome-section {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        .welcome-section h1 {
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+        .welcome-section p {
+            color: #666;
+            margin: 0;
+        }
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        .feature-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease;
+        }
+        .feature-card:hover {
+            transform: translateY(-2px);
+        }
+        .feature-card h3 {
+            color: #333;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .feature-card p {
+            color: #666;
+            margin-bottom: 1.5rem;
+            line-height: 1.5;
+        }
+        .feature-icon {
+            font-size: 1.5rem;
+        }
+        .action-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 0.9rem;
+            display: inline-block;
+            transition: transform 0.2s ease;
+        }
+        .action-btn:hover {
+            transform: translateY(-1px);
+        }
+        .upload-section {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-top: 2rem;
+        }
+        .upload-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .form-group label {
+            font-weight: 500;
+            color: #333;
+        }
+        .form-group input, .form-group select {
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+        }
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+            .main-content {
+                padding: 0 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">Sabaq</div>
+            <div class="user-info">
+                <span>Welcome, {{ user.username }}!</span>
+                <a href="{% url 'logout' %}" class="logout-btn">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <section class="welcome-section">
+            <h1>Welcome to Sabaq</h1>
+            <p>Accelerate your language learning by extracting flashcards from native texts. Upload documents and let our AI identify unfamiliar vocabulary to help you learn faster.</p>
+        </section>
+
+        <div class="features-grid">
+            <div class="feature-card">
+                <h3>
+                    <span class="feature-icon">📚</span>
+                    Document Processing
+                </h3>
+                <p>Upload text documents in your target language and automatically extract vocabulary that you haven't mastered yet.</p>
+                <a href="#upload" class="action-btn">Upload Document</a>
+            </div>
+
+            <div class="feature-card">
+                <h3>
+                    <span class="feature-icon">🎯</span>
+                    Smart Flashcards
+                </h3>
+                <p>Generate personalized flashcards based on your vocabulary gaps, complete with definitions and context.</p>
+                <a href="#" class="action-btn">View Flashcards</a>
+            </div>
+
+            <div class="feature-card">
+                <h3>
+                    <span class="feature-icon">📊</span>
+                    Progress Tracking
+                </h3>
+                <p>Monitor your learning progress and see how your vocabulary knowledge expands over time.</p>
+                <a href="#" class="action-btn">View Progress</a>
+            </div>
+
+            <div class="feature-card">
+                <h3>
+                    <span class="feature-icon">🌍</span>
+                    Multiple Languages
+                </h3>
+                <p>Currently supporting French with more languages coming soon. Learn at your own pace.</p>
+                <a href="#" class="action-btn">Explore Languages</a>
+            </div>
+        </div>
+
+        <section class="upload-section" id="upload">
+            <h2>Upload a Document</h2>
+            <p>Upload a text document to extract vocabulary and create personalized flashcards.</p>
+
+            <form class="upload-form" action="{% url 'upload_document' %}" method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="language">Language</label>
+                    <select id="language" name="language" required>
+                        <option value="">Select a language</option>
+                        <option value="fr">French</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="filetype">File Type</label>
+                    <select id="filetype" name="filetype" required>
+                        <option value="">Select file type</option>
+                        <option value="txt">Text (.txt)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="file">Choose File</label>
+                    <input type="file" id="file" name="file" accept=".txt" required>
+                </div>
+
+                <button type="submit" class="action-btn">Process Document</button>
+            </form>
+        </section>
+    </main>
+</body>
+</html>

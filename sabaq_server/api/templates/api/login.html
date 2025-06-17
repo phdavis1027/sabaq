@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Sabaq - Login</title>
+		<style>
+			body {
+				font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+				margin: 0;
+				padding: 0;
+				background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+				min-height: 100vh;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
+			.login-container {
+				background: white;
+				padding: 2rem;
+				border-radius: 10px;
+				box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+				width: 100%;
+				max-width: 400px;
+			}
+			.login-header {
+				text-align: center;
+				margin-bottom: 2rem;
+			}
+			.login-header h1 {
+				color: #333;
+				margin-bottom: 0.5rem;
+				font-size: 2rem;
+			}
+			.login-header p {
+				color: #666;
+				margin: 0;
+				font-size: 0.9rem;
+			}
+			.form-group {
+				margin-bottom: 1rem;
+			}
+			label {
+				display: block;
+				margin-bottom: 0.5rem;
+				color: #333;
+				font-weight: 500;
+			}
+			input[type="text"],
+			input[type="password"] {
+				width: 100%;
+				padding: 0.75rem;
+				border: 1px solid #ddd;
+				border-radius: 5px;
+				font-size: 1rem;
+				box-sizing: border-box;
+				transition: border-color 0.3s ease;
+			}
+			input[type="text"]:focus,
+			input[type="password"]:focus {
+				outline: none;
+				border-color: #667eea;
+				box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+			}
+			.login-button {
+				width: 100%;
+				padding: 0.75rem;
+				background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+				color: white;
+				border: none;
+				border-radius: 5px;
+				font-size: 1rem;
+				font-weight: 500;
+				cursor: pointer;
+				transition: transform 0.2s ease;
+				margin-top: 0.5rem;
+			}
+			.login-button:hover {
+				transform: translateY(-1px);
+			}
+			.register-link {
+				text-align: center;
+				margin-top: 1.5rem;
+				color: #666;
+				font-size: 0.9rem;
+			}
+			.register-link a {
+				color: #667eea;
+				text-decoration: none;
+			}
+			.register-link a:hover {
+				text-decoration: underline;
+			}
+			.error-message {
+				background: #fee;
+				color: #c33;
+				padding: 0.75rem;
+				border-radius: 5px;
+				border: 1px solid #fcc;
+				margin-bottom: 1rem;
+				font-size: 0.9rem;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="login-container">
+			<div class="login-header">
+				<h1>Sabaq</h1>
+				<p>Accelerate your language learning</p>
+			</div>
+
+			{% if error %}
+			<div class="error-message">{{ error }}</div>
+			{% endif %}
+
+			<form method="post">
+				{% csrf_token %}
+				<div class="form-group">
+					<label for="username">Username</label>
+					<input type="text" id="username" name="username" required />
+				</div>
+
+				<div class="form-group">
+					<label for="password">Password</label>
+					<input
+						type="password"
+						id="password"
+						name="password"
+						required
+					/>
+				</div>
+
+				<button type="submit" class="login-button">Sign In</button>
+			</form>
+
+			<div class="register-link">
+				<p>Don't have an account? <a href="#">Sign up</a></p>
+			</div>
+		</div>
+	</body>
+</html>

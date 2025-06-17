@@ -8,7 +8,7 @@ Sabaq accelerates language learning by automatically extracting flashcards for u
 
 ## Critical Architecture Decisions
 
-### components
+### Components
 - **scrape_tools** utilities for scraping and managing training data
 - **sabaq_llm** models used for training idiom-detection LLM models and converting data into a format they understand
 - **sabaq_server** the server which serves sabaq's public API
@@ -52,9 +52,10 @@ def my_function(arg1: str, arg2: int, arg3: models.Model) -> bool:
   * confusing, or
   * could have a bug
 
-## Domain Glossary (Claude, learn these!)
+## Domain Glossary (Agent, learn these!)
 
 - **BERT** - Bidirectional encoder representations from transformers (BERT). The base model used for idiom detection.
+- **SpaCy** - Production-grade NLP toolkit
 
 ## What AI Must NEVER Do
 

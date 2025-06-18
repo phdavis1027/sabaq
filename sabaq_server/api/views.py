@@ -12,9 +12,7 @@ import spacy
 from .models import (
 	Language,
 	Document,
-	BaseDictionaryEntry,
-	FrenchDictionaryEntry,
-	ArabicDictionaryEntry
+	DictionaryEntry,
 )
 
 def index(request):
@@ -115,19 +113,15 @@ def upload_document(request):
         for token in doc:
             if token.is_alpha and not token.is_stop:
                 word = token.lemma_.lower()
-                DictionaryEntryModel: type[BaseDictionaryEntry] = None
-                if language_code == 'fr':
-                    DictionaryEntryModel = FrenchDictionaryEntry
-                else:
-                    continue
 
                 try:
-                    dict_entry = DictionaryEntryModel.objects.get(word=word)
-                except DictionaryEntryModel.DoesNotExist:
-                    dict_entry = DictionaryEntryModel.objects.create(
+                    dict_entry = DictionaryEntry.objects.get(word=word)
+                except DictionaryEntry.DoesNotExist:
+                    dict_entry = DictionaryEntry.objects.create(
                         word=word,
                         definition=f"Definition for {word}",
-                        vector=[0.0] * 768
+                        vector=[0.0] * 768,
+                        language=language_code
                     )
 
                 if request.user not in dict_entry.owners.all():

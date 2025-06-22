@@ -10,10 +10,11 @@ import json
 import magic
 import spacy
 from .models import (
-	Language,
-	Document,
-	DictionaryEntry,
+    Language,
+    Document,
+    DictionaryEntry,
 )
+
 
 def index(request):
     if request.user.is_authenticated:
@@ -41,11 +42,13 @@ def index(request):
 
     return render(request, 'api/login.html')
 
+
 @login_required
 def dashboard(request):
     return render(request, 'api/dashboard.html', {
         'user': request.user
     })
+
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -120,7 +123,6 @@ def upload_document(request):
                     dict_entry = DictionaryEntry.objects.create(
                         word=word,
                         definition=f"Definition for {word}",
-                        vector=[0.0] * 768,
                         language=language_code
                     )
 

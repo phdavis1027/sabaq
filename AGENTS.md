@@ -20,6 +20,7 @@ Open document structures that allows quick iteration when dealing with non-unifo
 - Out-of-the-box auth
 - Keep all the code in Python
 - Managed migrations
+- Transparent ORM keeps database relatively portable
 
 ### Why Scrapy for scraping?
 - Able to re-use pipeline components between different data sources

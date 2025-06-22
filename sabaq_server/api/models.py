@@ -74,26 +74,6 @@ class Definition(models.Model):
 
     usage_count = models.IntegerField(default=0)
 
-    class Meta:
-        constraints = [
-            models.CheckConstraint(
-                check=models.Q(
-                    models.Q(
-                        dictionary_entry__language='fr',
-                        source__in=[choice[0]
-                                    for choice in FrenchDefinitionSource.choices]
-                    ) |
-                    models.Q(
-                        dictionary_entry__language='ar',
-                        source__in=[choice[0]
-                                    for choice in ArabicDefinitionSource.choices]
-                    )
-                ),
-                name='source_matches_entry_language',
-                violation_error_message='Definition source must be valid for dictionary entry language'
-            )
-        ]
-
     def clean(self):
         super().clean()
 

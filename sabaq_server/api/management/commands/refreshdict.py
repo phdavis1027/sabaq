@@ -9,10 +9,6 @@ import os
 
 
 class Command(BaseCommand):
-    """
-    AIDEV-NOTE: Hello-world Django management command for refresh_dict
-    This command serves as a basic template and can be extended to refresh dictionary data
-    """
     help = 'Hello world command for refreshing dictionary data'
 
     def add_arguments(self, parser):
@@ -27,4 +23,3 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         fwn = FreNetic(os.path.join(settings.BASE_DIR,
                        'api/static/wolf-1.0b4.xml'))
-        print(fwn.synsets('chien'))

@@ -26,9 +26,12 @@ class Command(BaseCommand):
         # Create Definitions for each DictionaryEntry
         entries = DictionaryEntry.objects.all()
         for entry in entries:
+            # Get definition from WOLF using fwn
+            definition_text = fwn.get_definition(entry.word)
             Definition.objects.create(
                 dictionary_entry=entry,
                 source=FrenchDefinitionSource.WOLF_WORDNET,
                 confidence=1.0,
-                usage_count=0
+                usage_count=0,
+                text=definition_text
             )

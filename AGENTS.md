@@ -27,6 +27,21 @@ Open document structures that allows quick iteration when dealing with non-unifo
 
 ## Code Style and Patterns
 
+### Semantic Markup
+
+Always try to use the most semantically appropriate HTML elements. For example, use `<h1>` for main headings, `<p>` for paragraphs, `<ul>` for lists, etc.
+We love `<section>` and `<nav>` too.
+
+### CSS
+
+- Write CSS under an axiomatic, exception-driven framework: broad rules with exceptions as needed. For example, to get bottom margin except on the last element of a bunch of concurrent sections, use something like:
+
+```css
+* + * {
+	margin-block-start: 1rem;
+}
+```
+
 ### Anchor comments
 
 Add specially formatted comments throughout the codebase, where appropriate, for yourself as inline knowledge that can be easily `grep`ped for.
@@ -57,6 +72,10 @@ def my_function(arg1: str, arg2: int, arg3: models.Model) -> bool:
 
 - **BERT** - Bidirectional encoder representations from transformers (BERT). The base model used for idiom detection.
 - **SpaCy** - Production-grade NLP toolkit
+- **WordNet** - a lexical database of semantic relations between words that links words into semantic relations including synonyms, hyponyms, and meronyms.
+- **WOLF** - A French WordNet
+- **FreNetic** - A Python parser for WOLF
+- **synset** - a set of one or more synonyms that are interchangeable in some context without changing the truth value of the proposition in which they are embedded.
 
 ## What AI Must NEVER Do
 

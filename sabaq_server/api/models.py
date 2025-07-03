@@ -71,35 +71,10 @@ class Definition(models.Model):
         choices=[choice for choice in DefinitionSource.choices]
     )
     confidence = models.FloatField(default=0.0)
+    text = models.TextField(blank=False, null=True)
 
     usage_count = models.IntegerField(default=0)
 
-    def clean(self):
-        super().clean()
-
-        if not self.dictionary_entry or not self.source:
-            return
-
-        entry_language = self.dictionary_entry.language
-
-        language_source_map = {
-            Language.FRENCH: [choice[0] for choice in FrenchDefinitionSource.choices],
-            Language.ARABIC: [choice[0] for choice in ArabicDefinitionSource.choices],
-        }
-
-        valid_sources = language_source_map.get(entry_language, [])
-
-        if self.source not in valid_sources:
-            source_class_name = {
-                Language.FRENCH: 'FrenchDefinitionSource',
-                Language.ARABIC: 'ArabicDefinitionSource',
-            }.get(entry_language, 'Unknown')
-
-            raise ValidationError({
-                'source': f'Source "{self.source}" is not valid for {entry_language} entries. '
-                f'Valid sources from {source_class_name}: {
-                    ", ".join(valid_sources)}'
-            })
 
     def save(self, *args, **kwargs):
         self.clean()

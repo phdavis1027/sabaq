@@ -1,0 +1,270 @@
+{% comment %} AIDEV-NOTE: Reusable component for displaying user's vocabulary
+list Expects: vocab_entries queryset of DictionaryEntry objects with prefetched
+definitions Usage: {% include 'api/vocab_list.html' with
+vocab_entries=user_vocab_entries %} {% endcomment %}
+
+<div class="vocab-list-container">
+	{% if vocab_entries %}
+	<div class="vocab-list">
+		{% for entry in vocab_entries %}
+		<div
+			class="vocab-item"
+			data-word-id="{{ entry.id }}"
+			data-language="{{ entry.language }}"
+		>
+			<div class="vocab-item-header">
+				<h3 class="vocab-word">{{ entry.word }}</h3>
+				<span
+					class="vocab-language-badge vocab-language-{{ entry.language }}"
+				>
+					{{ entry.get_language_display }}
+				</span>
+			</div>
+
+			<div class="vocab-definitions">
+				{% with definitions=entry.definition_set.all %} {% if
+				definitions %} {% for definition in definitions|slice:":3" %}
+				<div
+					class="vocab-definition"
+					data-source="{{ definition.source }}"
+				>
+					<div class="definition-content">
+						<p class="definition-text">
+							{{ definition.text|default:"No definition available"
+							}}
+						</p>
+						<div class="definition-meta">
+							<span class="definition-source"
+								>{{ definition.get_source_display }}</span
+							>
+							{% if definition.confidence > 0 %}
+							<span
+								class="definition-confidence"
+								title="Confidence: {{ definition.confidence|floatformat:2 }}"
+							>
+								{% if definition.confidence >= 0.8 %}★★★{% elif
+								definition.confidence >= 0.6 %}★★☆{% elif
+								definition.confidence >= 0.4 %}★☆☆{% else
+								%}☆☆☆{% endif %}
+							</span>
+							{% endif %} {% if definition.usage_count > 0 %}
+							<span
+								class="usage-count"
+								title="Used {{ definition.usage_count }} time{{ definition.usage_count|pluralize }}"
+							>
+								{{ definition.usage_count }} use{{
+								definition.usage_count|pluralize }}
+							</span>
+							{% endif %}
+						</div>
+					</div>
+				</div>
+				{% endfor %} {% if definitions.count > 3 %}
+				<div class="more-definitions">
+					<button class="show-more-btn" data-word-id="{{ entry.id }}">
+						Show {{ definitions.count|add:"-3" }} more definition{{
+						definitions.count|add:"-3"|pluralize }}
+					</button>
+				</div>
+				{% endif %} {% else %}
+				<div class="no-definitions">
+					<p class="text-muted">
+						No definitions available for this word.
+					</p>
+				</div>
+				{% endif %} {% endwith %}
+			</div>
+		</div>
+		{% endfor %}
+	</div>
+	{% else %}
+	<div class="empty-vocab-list">
+		<div class="empty-state">
+			<h3>No vocabulary items yet</h3>
+			<p>Start reading documents to build your vocabulary collection!</p>
+		</div>
+	</div>
+	{% endif %}
+</div>
+
+<style>
+	.vocab-list-container {
+		width: 100%;
+		max-width: 800px;
+		margin: 0 auto;
+	}
+
+	.vocab-list {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.vocab-item {
+		background: #fff;
+		border: 1px solid #e0e0e0;
+		border-radius: 8px;
+		padding: 1rem;
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+		transition: box-shadow 0.2s ease;
+	}
+
+	.vocab-item:hover {
+		box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+	}
+
+	.vocab-item-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 0.75rem;
+		border-bottom: 1px solid #f0f0f0;
+		padding-bottom: 0.5rem;
+	}
+
+	.vocab-word {
+		margin: 0;
+		font-size: 1.25rem;
+		font-weight: 600;
+		color: #333;
+	}
+
+	.vocab-language-badge {
+		padding: 0.25rem 0.5rem;
+		border-radius: 4px;
+		font-size: 0.75rem;
+		font-weight: 500;
+		text-transform: uppercase;
+	}
+
+	.vocab-language-fr {
+		background-color: #e3f2fd;
+		color: #1976d2;
+	}
+
+	.vocab-language-ar {
+		background-color: #fff3e0;
+		color: #f57c00;
+	}
+
+	.vocab-definitions {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.vocab-definition {
+		padding: 0.5rem;
+		background-color: #fafafa;
+		border-radius: 4px;
+		border-left: 3px solid #ddd;
+	}
+
+	.definition-content {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.definition-text {
+		margin: 0;
+		color: #444;
+		line-height: 1.4;
+	}
+
+	.definition-meta {
+		display: flex;
+		gap: 0.75rem;
+		align-items: center;
+		font-size: 0.8rem;
+		color: #666;
+	}
+
+	.definition-source {
+		font-weight: 500;
+		text-transform: capitalize;
+	}
+
+	.definition-confidence {
+		color: #ff9800;
+		cursor: help;
+	}
+
+	.usage-count {
+		color: #4caf50;
+		cursor: help;
+	}
+
+	.show-more-btn {
+		background: none;
+		border: 1px solid #ddd;
+		color: #666;
+		padding: 0.5rem 1rem;
+		border-radius: 4px;
+		cursor: pointer;
+		font-size: 0.85rem;
+		transition: all 0.2s ease;
+	}
+
+	.show-more-btn:hover {
+		background-color: #f5f5f5;
+		border-color: #bbb;
+	}
+
+	.no-definitions {
+		padding: 1rem;
+		text-align: center;
+	}
+
+	.text-muted {
+		color: #999;
+		font-style: italic;
+		margin: 0;
+	}
+
+	.empty-vocab-list {
+		text-align: center;
+		padding: 2rem;
+	}
+
+	.empty-state h3 {
+		color: #666;
+		margin-bottom: 0.5rem;
+	}
+
+	.empty-state p {
+		color: #999;
+		margin: 0;
+	}
+
+	@media (max-width: 768px) {
+		.vocab-item-header {
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 0.5rem;
+		}
+
+		.definition-meta {
+			flex-wrap: wrap;
+		}
+	}
+</style>
+
+<script>
+	document.addEventListener("DOMContentLoaded", function () {
+		// AIDEV-NOTE: Handle "show more definitions" functionality
+		const showMoreButtons = document.querySelectorAll(".show-more-btn");
+
+		showMoreButtons.forEach((button) => {
+			button.addEventListener("click", function () {
+				const wordId = this.dataset.wordId;
+				// AIDEV-TODO: Implement AJAX call to fetch additional definitions
+				// This would require a corresponding Django view to handle the request
+				console.log("Show more definitions for word ID:", wordId);
+
+				// Placeholder: Hide the button for now
+				this.style.display = "none";
+			});
+		});
+	});
+</script>

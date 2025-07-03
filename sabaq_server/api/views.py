@@ -1,4 +1,4 @@
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_required
@@ -6,6 +6,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.utils.decorators import method_decorator
 from django.core.exceptions import ValidationError
+from django.core import serializers
+
 import json
 import magic
 import spacy
@@ -100,15 +102,10 @@ def upload_document(request):
         uploaded_file.seek(0)
         text_content = file_content.decode('utf-8')
 
-        try:
-            if language_code == 'fr':
-                nlp = spacy.load("fr_dep_news_trf")
-            else:
-                return JsonResponse({'error': 'Unsupported language for tokenization'}, status=400)
-        except OSError:
-            return JsonResponse({
-                'error': 'Required spacy model not installed. Please install fr_dep_news_trf.'
-            }, status=500)
+        if language_code == 'fr':
+            nlp = spacy.load("fr_dep_news_trf")
+        else:
+            return JsonResponse({'error': 'Unsupported language for tokenization'}, status=400)
 
         doc = nlp(text_content)
         processed_tokens = []
@@ -126,15 +123,16 @@ def upload_document(request):
                         language=language_code
                     )
 
-                if request.user not in dict_entry.owners.all():
-                    dict_entry.owners.add(request.user)
-
                 processed_tokens.append({
                     'word': word,
                     'original_text': token.text,
                     'pos': token.pos_,
-                    'is_new_entry': dict_entry.pk is not None
+                    'is_new_entry': dict_entry is None
                 })
+
+                if request.user not in dict_entry.owners.all():
+                    dict_entry.owners.add(request.user)
+
 
         # AIDEV-NOTE: Could create Document record here if needed for tracking
         # document = Document.objects.create(
@@ -155,3 +153,33 @@ def upload_document(request):
         return JsonResponse({'error': 'File encoding error. Please ensure file is UTF-8 encoded.'}, status=400)
     except Exception as e:
         return JsonResponse({'error': f'An error occurred processing the document: {str(e)}'}, status=500)
+
+
+@login_required
+@require_http_methods(["GET"])
+def dictionary_entries(request):
+    """
+    Retrieves dictionary entries owned by a particular user
+    Order-Bys will be applied in the order they appear
+    """
+    query = {
+        'owners': request.user
+    }
+
+    if langs := request.GET.get('languages'):
+        query['language__in'] = langs
+
+    entries = DictionaryEntry.objects.filter(**query)
+
+    if order_bys := request.GET.get('order_bys'):
+        for order_by in order_bys.split(','):
+            entries = entries.order_by(order_by)
+
+    return HttpResponse(
+        serializers.serialize(
+            "json",
+            entries,
+            fields = ["language", "word"]
+        ),
+        content_type="application/json"
+    )

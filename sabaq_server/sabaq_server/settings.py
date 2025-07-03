@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-u61j13conf5es1e%*pz(mvxms=8a63f(0rz$t8!h&bg7y!e_!d
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['testserver', '127.0.0.1']
 
 
 # Application definition
@@ -72,7 +72,7 @@ WSGI_APPLICATION = 'sabaq_server.wsgi.application'
 
 DATABASES = {
     'default': {
-	    "ENGINE": "django.db.backends.postgresql",
+        "ENGINE": "django.db.backends.postgresql",
         "OPTIONS": {
             "service": "sabaq_service",
         },

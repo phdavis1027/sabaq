@@ -27,7 +27,6 @@ class Command(BaseCommand):
         entries = DictionaryEntry.objects.all()
         for entry in entries:
             # Get definition from WOLF using fwn
-            print("REFRESHING", entry.word)
             definition_text = fwn.synsets(entry.word)[0].defn()
             Definition.objects.create(
                 dictionary_entry=entry,

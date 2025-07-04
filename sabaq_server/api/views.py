@@ -1,4 +1,4 @@
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_required
@@ -15,8 +15,11 @@ from .models import (
     Language,
     Document,
     DictionaryEntry,
+    Definition,
 )
 
+# AIDEV-NOTE: Use built-in Django serializers and deserializers if at all possible
+# AIDEV-NOTE: To read JSON bodies, use `request.data` and `get()` keys as you need them
 
 def index(request):
     if request.user.is_authenticated:
@@ -169,17 +172,100 @@ def dictionary_entries(request):
     if langs := request.GET.get('languages'):
         query['language__in'] = langs
 
-    entries = DictionaryEntry.objects.filter(**query)
+    entries = DictionaryEntry.objects.filter(**query).values('word', 'language')
 
     if order_bys := request.GET.get('order_bys'):
         for order_by in order_bys.split(','):
             entries = entries.order_by(order_by)
 
-    return HttpResponse(
-        serializers.serialize(
-            "json",
-            entries,
-            fields = ["language", "word"]
-        ),
-        content_type="application/json"
-    )
+    data = list(entries)
+    return JsonResponse(data)
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+@login_required
+def definitions(request):
+    """
+    AIDEV-NOTE: Authenticated endpoint for retrieving definitions based on dictionary entries and filters.
+    Expects JSON body with dictionary_entries array and optional filters for source and confidence.
+    Returns definitions grouped by dictionary entry word.
+    """
+    try:
+        # import pdb
+        # pdb.set_trace()
+        raw_data = request.body.decode('utf-8')
+        data = json.loads(raw_data)
+
+        # Validate required fields
+        if 'dictionary_entries' not in data:
+            return JsonResponse({'error': 'Missing required field: dictionary_entries'}, status=400)
+
+        dictionary_entries = data.get("dictionary_entries")
+        if not isinstance(dictionary_entries, list):
+            return JsonResponse({'error': 'dictionary_entries must be an array'}, status=400)
+
+        if not dictionary_entries:
+            return JsonResponse({'error': 'dictionary_entries cannot be empty'}, status=400)
+
+        filters = data.get('filters', {})
+
+        # Validate filters
+        if filters:
+            if 'confidence' in filters:
+                confidence_filter = filters['confidence']
+                if 'greaterThan' in confidence_filter:
+                    gt_val = confidence_filter['greaterThan']
+                    if not isinstance(gt_val, (int, float)) or not (0 <= gt_val <= 1):
+                        return JsonResponse({'error': 'confidence.greaterThan must be a number between 0 and 1'}, status=400)
+
+                if 'lessThan' in confidence_filter:
+                    lt_val = confidence_filter['lessThan']
+                    if not isinstance(lt_val, (int, float)) or not (0 <= lt_val <= 1):
+                        return JsonResponse({'error': 'confidence.lessThan must be a number between 0 and 1'}, status=400)
+
+        result = {}
+
+        # pdb.set_trace()
+
+        for entry_word in dictionary_entries:
+            try:
+                # Get the dictionary entry
+                dict_entry = DictionaryEntry.objects.get(word=entry_word)
+
+                # Check if user owns this entry
+                if not dict_entry.owners.filter(id=request.user.id).exists():
+                    result[entry_word] = []
+                    continue
+
+                # Build definition query
+                definition_query = Definition.objects.filter(dictionary_entry=dict_entry)
+
+                # Apply filters
+                if filters:
+                    if 'source' in filters:
+                        definition_query = definition_query.filter(source=filters['source'])
+
+                    if 'confidence' in filters:
+                        confidence_filter = filters['confidence']
+                        if 'greaterThan' in confidence_filter:
+                            definition_query = definition_query.filter(confidence__gt=confidence_filter['greaterThan'])
+                        if 'lessThan' in confidence_filter:
+                            definition_query = definition_query.filter(confidence__lt=confidence_filter['lessThan'])
+
+                # Get definitions and serialize
+                definitions = definition_query.only('source', 'confidence', 'text', 'usage_count')
+
+                result[entry_word] = serializers.serialize('json', definitions)
+
+            except DictionaryEntry.DoesNotExist:
+                # If dictionary entry doesn't exist, return empty array
+                result[entry_word] = []
+
+        # pdb.set_trace()
+        return JsonResponse(result)
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': f'An error occurred processing the request: {str(e)}'}, status=500)

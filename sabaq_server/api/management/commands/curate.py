@@ -22,6 +22,7 @@ class Command(BaseCommand):
       python manage.py curate --language ar --status pending
       python manage.py curate --language fr --status approved --n 5
       python manage.py curate --language fr --source wolf_wordnet --n 20
+      python manage.py curate --language fr --skip-words "bonjour,merci,au revoir"
     '''
 
     def add_arguments(self, parser):
@@ -52,6 +53,12 @@ class Command(BaseCommand):
             default=None,
             help='Filter definitions by source (e.g., "wolf_wordnet", "wiktionary")'
         )
+        parser.add_argument(
+            '--skip-words',
+            type=str,
+            default=None,
+            help='Comma-separated list of dictionary entry words to skip (e.g., "word1,word2,word3")'
+        )
 
     def handle(self, *args, **options):
         # Get editor from environment
@@ -66,6 +73,11 @@ class Command(BaseCommand):
         # Apply source filter if specified
         if options['source']:
             queryset = queryset.filter(source=options['source'])
+
+        # Apply skip-words filter if specified
+        if options['skip_words']:
+            skip_words = [word.strip() for word in options['skip_words'].split(',')]
+            queryset = queryset.exclude(dictionary_entry__word__in=skip_words)
 
         # Apply limit if specified
         if options['n'] is not None:

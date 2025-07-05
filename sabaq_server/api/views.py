@@ -17,6 +17,7 @@ from .models import (
     DictionaryEntry,
     Definition,
 )
+from .utils import json_required, file_required
 
 # AIDEV-NOTE: Use built-in Django serializers and deserializers if at all possible
 # AIDEV-NOTE: To read JSON bodies, use `request.data` and `get()` keys as you need them
@@ -55,6 +56,8 @@ def dashboard(request):
     })
 
 
+@file_required([lambda files: 'document' in files])
+@json_required(['filetype', 'language'])
 @csrf_exempt
 @require_http_methods(["POST"])
 @login_required
@@ -65,24 +68,10 @@ def upload_document(request):
     Currently supports only French ('fr') language and text ('txt') files.
     """
     try:
-        if request.content_type.startswith('multipart/form-data'):
-            filetype = request.POST.get('filetype')
-            language_code = request.POST.get('language')
-            uploaded_file = request.FILES.get('file')
-        else:
-            try:
-                data = json.loads(request.body)
-                filetype = data.get('filetype')
-                language_code = data.get('language')
-                uploaded_file = None
-            except json.JSONDecodeError:
-                return JsonResponse({'error': 'Invalid JSON data'}, status=400)
-
-        # Validate required fields
-        if not all([filetype, language_code, uploaded_file]):
-            return JsonResponse({
-                'error': 'Missing required fields: filetype, language, and file are required'
-            }, status=400)
+        data = request.json
+        filetype = data.get('filetype')
+        language_code = data.get('language')
+        uploaded_file = request.FILES.get('document')
 
         if language_code != 'fr':
             return JsonResponse({
@@ -182,6 +171,7 @@ def dictionary_entries(request):
     return JsonResponse(data)
 
 
+@json_required(['dictionary_entries'])
 @csrf_exempt
 @require_http_methods(["GET"])
 @login_required
@@ -192,14 +182,7 @@ def definitions(request):
     Returns definitions grouped by dictionary entry word.
     """
     try:
-        # import pdb
-        # pdb.set_trace()
-        raw_data = request.body.decode('utf-8')
-        data = json.loads(raw_data)
-
-        # Validate required fields
-        if 'dictionary_entries' not in data:
-            return JsonResponse({'error': 'Missing required field: dictionary_entries'}, status=400)
+        data = request.json
 
         dictionary_entries = data.get("dictionary_entries")
         if not isinstance(dictionary_entries, list):
@@ -225,8 +208,6 @@ def definitions(request):
                         return JsonResponse({'error': 'confidence.lessThan must be a number between 0 and 1'}, status=400)
 
         result = {}
-
-        # pdb.set_trace()
 
         for entry_word in dictionary_entries:
             try:

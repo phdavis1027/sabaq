@@ -54,11 +54,6 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        # AIDEV-NOTE: This command hits the actual definitions API endpoint
-        # for desk checking purposes by making real HTTP requests with authentication.
-        import pdb
-
-
         try:
             user = User.objects.get(id=options['user'])
         except User.DoesNotExist:
@@ -138,4 +133,3 @@ class Command(BaseCommand):
             self.stdout.write(
                 self.style.ERROR(f'Error making request: {str(e)}')
             )
-            pdb.post_mortem()

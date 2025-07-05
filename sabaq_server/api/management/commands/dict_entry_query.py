@@ -42,13 +42,6 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        # AIDEV-NOTE: This command hits the actual user_dictionary_entries API endpoint
-        # for desk checking purposes by making real HTTP requests with authentication.
-
-        import pdb
-
-        pdb.set_trace()
-
         try:
             user = User.objects.get(id=options['user'])
         except User.DoesNotExist:

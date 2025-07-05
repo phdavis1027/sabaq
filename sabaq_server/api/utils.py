@@ -123,21 +123,8 @@ def timestamped(cls):
 
     # Add the timestamp fields
     cls.add_to_class('created',
-        models.DateTimeField(editable=False, default=default_now))
+        models.DateTimeField(auto_now_add=True))
     cls.add_to_class('modified',
-        models.DateTimeField(default=default_now))
-
-    # Store the original save method
-    original_save = cls.save
-
-    def save(self, *args, **kwargs):
-        """On save, update timestamps"""
-        if not self.id:
-            self.created = timezone.now()
-        self.modified = timezone.now()
-        return original_save(self, *args, **kwargs)
-
-    # Override the save method
-    cls.save = save
+        models.DateTimeField(auto_now=True))
 
     return cls

@@ -4,6 +4,10 @@ import os
 import sys
 
 
+import builtins
+if not hasattr(builtins, 'unij'):
+	builtins.unicode = str
+
 def main():
     """Run administrative tasks."""
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'sabaq_server.settings')

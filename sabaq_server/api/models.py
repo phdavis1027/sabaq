@@ -10,6 +10,13 @@ class Language(models.TextChoices):
 
 # Create your models here.
 
+# AIDEV-NOTE: Example of using the @timestamped decorator:
+# @timestamped
+# class User(models.Model):
+#     name = models.CharField(max_length=100)
+#     email = models.EmailField()
+#     # created and modified fields are automatically added
+
 
 @timestamped
 class Document(models.Model):
@@ -64,6 +71,12 @@ class ArabicDefinitionSource(DefinitionSource):
     ARATOOLS = 'aratools'
 
 
+class CurationStatus(models.TextChoices):
+    PENDING = 'pending'
+    APPROVED = 'approved'
+    REJECTED = 'rejected'
+
+
 @timestamped
 class Definition(models.Model):
     dictionary_entry = models.ForeignKey(
@@ -78,3 +91,9 @@ class Definition(models.Model):
     text = models.TextField(blank=False, null=True)
 
     usage_count = models.IntegerField(default=0)
+
+    curation_status = models.CharField(
+        max_length=32,
+        choices=[choice for choice in CurationStatus.choices],
+        default=CurationStatus.PENDING
+    )

@@ -1,3 +1,11 @@
+# NOTE:
+Only the Django portion of this app is under active development. The scraping and learning features are exciting next steps!
+
+# ALSO NOTE:
+
+This project's main host is radicle. Check it out [here](https://app.radicle.xyz/nodes/ash.radicle.garden/rad:z4LYjbg8fB7hzBvQ93K8uZjwycDES)
+
+
 ***Make sure to clone recursive.***
 
 Installing deps (use a venv!):

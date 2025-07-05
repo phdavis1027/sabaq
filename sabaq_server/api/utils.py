@@ -4,6 +4,8 @@ import uuid
 import random
 
 from django.http import JsonResponse
+from django.db import models
+from django.utils import timezone
 
 
 def json_required(required_fields=None):
@@ -97,3 +99,45 @@ def random_int():
 
 def random_uuid():
     return uuid.uuid1(random_int())
+
+def default_now():
+    return timezone.now()
+
+def timestamped(cls):
+    """
+    AIDEV-NOTE: Decorator that automatically adds created and modified timestamp fields
+    to Django models and overrides the save method to update them automatically.
+
+    Usage:
+        @timestamped
+        class MyModel(models.Model):
+            # your fields here
+            pass
+
+    This will add:
+    - created: DateTimeField(editable=False) - set only on creation
+    - modified: DateTimeField() - updated on every save
+    """
+    if not issubclass(cls, models.Model):
+        raise TypeError("@timestamped can only be applied to Django Model classes")
+
+    # Add the timestamp fields
+    cls.add_to_class('created',
+        models.DateTimeField(editable=False, default=default_now))
+    cls.add_to_class('modified',
+        models.DateTimeField(default=default_now))
+
+    # Store the original save method
+    original_save = cls.save
+
+    def save(self, *args, **kwargs):
+        """On save, update timestamps"""
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return original_save(self, *args, **kwargs)
+
+    # Override the save method
+    cls.save = save
+
+    return cls

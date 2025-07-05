@@ -2,7 +2,7 @@ from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from pgvector.django import VectorField
-
+from .utils import timestamped
 
 class Language(models.TextChoices):
     FRENCH = 'fr'
@@ -11,6 +11,7 @@ class Language(models.TextChoices):
 # Create your models here.
 
 
+@timestamped
 class Document(models.Model):
     class Filetype(models.TextChoices):
         PDF = 'pdf'
@@ -29,6 +30,7 @@ class Document(models.Model):
     )
 
 
+@timestamped
 class ExampleSentence(models.Model):
     text = models.TextField()
     language = models.CharField(
@@ -38,6 +40,7 @@ class ExampleSentence(models.Model):
     )
 
 
+@timestamped
 class DictionaryEntry(models.Model):
     owners = models.ManyToManyField(settings.AUTH_USER_MODEL)
     word = models.CharField(max_length=100, unique=True)
@@ -61,6 +64,7 @@ class ArabicDefinitionSource(DefinitionSource):
     ARATOOLS = 'aratools'
 
 
+@timestamped
 class Definition(models.Model):
     dictionary_entry = models.ForeignKey(
         'DictionaryEntry',
@@ -74,8 +78,3 @@ class Definition(models.Model):
     text = models.TextField(blank=False, null=True)
 
     usage_count = models.IntegerField(default=0)
-
-
-    def save(self, *args, **kwargs):
-        self.clean()
-        super().save(*args, **kwargs)

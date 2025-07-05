@@ -7,17 +7,21 @@ from django.views.decorators.http import require_http_methods
 from django.utils.decorators import method_decorator
 from django.core.exceptions import ValidationError
 from django.core import serializers
+import pdb
 
 import json
 import magic
 import spacy
+import genanki
+import tempfile
+import os
 from .models import (
     Language,
     Document,
     DictionaryEntry,
     Definition,
 )
-from .utils import json_required, file_required
+from .utils import json_required, file_required, random_int
 
 # AIDEV-NOTE: Use built-in Django serializers and deserializers if at all possible
 # AIDEV-NOTE: To read JSON bodies, use `request.data` and `get()` keys as you need them
@@ -243,10 +247,133 @@ def definitions(request):
                 # If dictionary entry doesn't exist, return empty array
                 result[entry_word] = []
 
-        # pdb.set_trace()
         return JsonResponse(result)
 
-    except json.JSONDecodeError:
-        return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+
     except Exception as e:
         return JsonResponse({'error': f'An error occurred processing the request: {str(e)}'}, status=500)
+
+
+@json_required(['deck_name', 'definition_set'])
+@csrf_exempt
+@require_http_methods(["POST"])
+@login_required
+def export_definition_set_to_anki(request):
+    """
+    AIDEV-NOTE: Authenticated endpoint for exporting definition sets to Anki .apkg format.
+    Expects JSON body with deck_name, definition_set (from definitions endpoint), and optional sources filter.
+    Returns .apkg file as binary response. Pure function - no database modifications.
+    """
+    try:
+        data = request.json
+
+        deck_name = data.get('deck_name')
+        definition_set = data.get('definition_set')
+        sources = data.get('sources', [])
+
+        if not isinstance(definition_set, dict):
+            return JsonResponse({'error': 'definition_set must be an object'}, status=400)
+
+        if sources and not isinstance(sources, list):
+            return JsonResponse({'error': 'sources must be an array'}, status=400)
+
+        # Create Anki deck
+        deck_id = random_int()
+        deck = genanki.Deck(deck_id, deck_name)
+
+        # Define note model for flashcards
+        model = genanki.Model(
+            random_int(),
+            'Sabaq Basic Model',
+            fields=[
+                {'name': 'Front'},
+                {'name': 'Back'},
+            ],
+            templates=[
+                {
+                    'name': 'Card 1',
+                    'qfmt': '{{Front}}',
+                    'afmt': '{{FrontSide}}<hr id="answer">{{Back}}',
+                },
+            ]
+        )
+
+        cards_created = 0
+
+        # Process each word in the definition set
+        for word, definitions_json in definition_set.items():
+            if not definitions_json:
+                continue
+
+            # Parse the serialized definitions
+            try:
+                definitions = json.loads(definitions_json)
+            except (json.JSONDecodeError, TypeError):
+                #  TODO: Send to Glitchtip
+                continue
+
+            # Filter definitions by source if sources filter is provided
+            if sources:
+                filtered_definitions = [
+                    defn for defn in definitions
+                    if defn.get('fields', {}).get('source') in sources
+                ]
+            else:
+                filtered_definitions = definitions
+
+            if not filtered_definitions:
+                continue
+
+            # Find definition with highest confidence
+            best_definition = max(
+                filtered_definitions,
+                key=lambda d: d.get('fields', {}).get('confidence', 0)
+            )
+
+            definition_text = best_definition.get('fields', {}).get('text', '')
+
+            if not definition_text:
+                continue
+
+            # Create Anki note
+            note = genanki.Note(
+                model=model,
+                fields=[word, definition_text]
+            )
+
+            deck.add_note(note)
+            cards_created += 1
+
+        if cards_created == 0:
+            return JsonResponse({'error': 'No valid definitions found to export'}, status=400)
+
+        # Generate .apkg file
+        package = genanki.Package(deck)
+
+        # Create temporary file
+        # Can be cleaned up easily since we can trivially just purge all .apkg files in the directory
+        with tempfile.NamedTemporaryFile(suffix='.apkg', delete=False) as tmp_file:
+            package.write_to_file(tmp_file.name)
+            tmp_file_path = tmp_file.name
+
+        try:
+            # Read the .apkg file and return as response
+            with open(tmp_file_path, 'rb') as f:
+                apkg_data = f.read()
+
+            response = HttpResponse(
+                apkg_data,
+                content_type='application/octet-stream'
+            )
+            response['Content-Disposition'] = f'attachment; filename="{deck_name}.apkg"'
+
+            return response
+
+        finally:
+            # Clean up temporary file
+            if os.path.exists(tmp_file_path):
+                os.unlink(tmp_file_path)
+
+
+    except Exception as e:
+        return JsonResponse({'error': f'An error occurred exporting to Anki: {str(e)}'}, status=500)

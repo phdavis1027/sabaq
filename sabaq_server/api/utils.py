@@ -1,5 +1,8 @@
 import json
 from functools import wraps
+import uuid
+import random
+
 from django.http import JsonResponse
 
 
@@ -87,3 +90,10 @@ def file_required(validation_funcs=None):
     else:
         # Called as @file_required() or @file_required(validation_funcs)
         return decorator
+
+# Nabbed from: https://stackoverflow.com/questions/35210753/how-does-a-django-uuidfield-generate-a-uuid-in-postgresql
+def random_int():
+    return random.randint(0, 281474976710655)
+
+def random_uuid():
+    return uuid.uuid1(random_int())

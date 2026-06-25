@@ -1,19 +1,13 @@
 from itemadapter import ItemAdapter
 
-import git
-
-import time
 
 class StatisticsPipeline:
     def open_spider(self, spider):
-        repo = git.Repo(search_parent_directories=True) 
-        sha = repo.head.object.hexsha
-
         self.stats = {
             'unique_idioms': 0,
             'total_examples': 0,
-            'avg_examples_per_idiom': 0,
-            'avg_length_of_example': 0,
+            'avg_examples_per_idiom': 0.0,
+            'avg_length_of_example': 0.0,
         }
 
     def process_item(self, item, spider):
@@ -27,6 +21,7 @@ class StatisticsPipeline:
         return item
 
     def close_spider(self, spider):
-        self.stats['avg_length_of_example'] /= self.stats['total_examples']
+        if self.stats['total_examples']:
+            self.stats['avg_length_of_example'] /= self.stats['total_examples']
 
         print(self.stats)

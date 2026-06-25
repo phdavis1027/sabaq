@@ -10,8 +10,7 @@ This project's main host is radicle. Check it out [here](https://app.radicle.xyz
 
 Installing deps (use a venv!):
 ```bash
-pip install -r requirements/dev.txt
-pip install requirements/FreNetic
+uv sync
 ```
 
 Running credit to exciting research that I have referenced for algorithms:

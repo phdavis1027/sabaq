@@ -1,3 +1,11 @@
+import logging
+import os
+
+logging.getLogger("pymongo").setLevel(logging.WARNING)
+logging.getLogger("pymongo.topology").setLevel(logging.WARNING)
+logging.getLogger("pymongo.connection").setLevel(logging.WARNING)
+logging.getLogger("pymongo.serverSelection").setLevel(logging.WARNING)
+
 # Scrapy settings for scrape_tools project
 #
 # For simplicity, this file contains only settings considered important or
@@ -6,15 +14,18 @@
 #     https://docs.scrapy.org/en/latest/topics/settings.html
 #     https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #     https://docs.scrapy.org/en/latest/topics/spider-middleware.html
-MONGO_URI='mongodb://localhost:27017'
-MONGO_DB='sabaq'
+MONGO_URI = os.getenv('MONGO_URI', 'mongodb://localhost:27017')
+MONGO_DB = os.getenv('MONGO_DB', 'sabaq')
+MONGO_RAW_COLLECTION = os.getenv('MONGO_RAW_COLLECTION', 'fr_wiktionary_raw')
+MONGO_TRAINING_COLLECTION = os.getenv('MONGO_TRAINING_COLLECTION', 'training_fr_wiktionary')
+SPACY_MODEL='fr_dep_news_trf'
 
 BOT_NAME = 'scrape_tools'
 
 SPIDER_MODULES = ['scrape_tools.spiders']
 NEWSPIDER_MODULE = 'scrape_tools.spiders'
 
-SIMILARITY_THRESHOLD = 0.8
+SIMILARITY_THRESHOLD = 0.9
 
 THROW_OUT_UNTAGGED = True
 
@@ -72,9 +83,7 @@ DOWNLOAD_DELAY = 0.2
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
     'scrape_tools.pipelines.statistics_pipeline.StatisticsPipeline': 100,
-    'scrape_tools.pipelines.mongo_pipeline.MongoPipeline': 300,
-#    'scrape_tools.pipelines.statistics_pipeline.StatisticsPipeline': 100,
-#    'scrape_tools.pipelines.fr_wiktionary_pipeline.FrLabelIdiomsPipeline': 200,
+    'scrape_tools.pipelines.fr_wiktionary_pipeline.FrLabelIdiomsPipeline': 200,
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)

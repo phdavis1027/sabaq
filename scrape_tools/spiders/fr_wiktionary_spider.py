@@ -2,9 +2,9 @@ import unicodedata
 
 import scrapy
 
-import git
-
 from bs4 import BeautifulSoup as bs
+
+from scrape_tools.util import gen_run_id
 
 # TODO: Add a pipeline step that applies unicode normalization
 
@@ -57,9 +57,11 @@ class FrWiktionarySpider(scrapy.Spider):
 
     def __init__(self, category=None, *args, **kwargs):
         super(FrWiktionarySpider, self).__init__(*args, **kwargs)
-        self.run_id = kwargs["run_id"]
+        self.run_id = kwargs.get("run_id") or gen_run_id(
+            "fr_wiktionary", "wiktionary", "fr"
+        )
 
-    def start_requests(self):
+    async def start(self):
         for url in urls:
             yield scrapy.Request(url=url, callback=self.parse)
 

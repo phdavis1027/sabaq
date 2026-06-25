@@ -1,0 +1,39 @@
+[project]
+name = "sabaq"
+version = "0.1.0"
+description = "Automatically extract flashcards for unfamiliar vocabulary from native texts."
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "Django==5.2.3",
+    "PyPDF2~=3.0.1",
+    "accelerate>=0.26.0",
+    "beautifulsoup4~=4.10.0",
+    "datasets==2.16.1",
+    "genanki==0.13.1",
+    "fr-dep-news-trf @ https://github.com/explosion/spacy-models/releases/download/fr_dep_news_trf-3.8.0/fr_dep_news_trf-3.8.0-py3-none-any.whl",
+    "gitpython~=3.1.24",
+    "googletrans>=3.1.0a0",
+    "matplotlib~=3.9.2",
+    "nltk~=3.7",
+    "pgvector==0.4.1",
+    "psycopg>=3.2.9",
+    "pymongo~=4.9.1",
+    "python-magic~=0.4.27",
+    "scikit-learn>=1.0.2",
+    "scrapy>=2.13.0,<3",
+    "seqeval~=1.2.2",
+    "spacy~=3.8.7",
+    "torch~=2.7.1",
+    "transformers>=4.39.3",
+    "rapidfuzz>=3.14.5",
+]
+
+[dependency-groups]
+dev = [
+    "jedi==0.19.2",
+    "python-lsp-server==1.12.2",
+]
+
+[tool.uv]
+package = false

@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import os
 
-import pymongo
+from datasets import DatasetDict, load_dataset, load_from_disk
 import spacy
 import torch
 from transformers import TrainingArguments
 
-from sabaq_llm.data import build_tokenized_dataset
+from sabaq_llm.data import build_dataset_dict, tokenize_dataset_dict
 from sabaq_llm.model import load_cohesion_model_bundle, load_token_classification_bundle
-from sabaq_llm.mongo import training_rows_from_record
+from sabaq_llm.mongo import load_training_rows_from_mongo
 from sabaq_llm.trainer import (
     AsyncRuntime,
     CohesionConfig,
@@ -21,24 +21,56 @@ from sabaq_llm.trainer import (
 )
 
 
+def load_dataset_dict_from_env(source: str, seed: int) -> DatasetDict:
+    match source:
+        case "mongo":
+            rows = load_training_rows_from_mongo(
+                mongo_uri=os.getenv("MONGO_URI", "mongodb://localhost:27017"),
+                mongo_db=os.getenv("MONGO_DB", "sabaq"),
+                training_collection=os.getenv(
+                    "TRAINING_COLLECTION",
+                    "training_fr_wiktionary",
+                ),
+                max_training_rows=os.getenv("MAX_TRAINING_ROWS"),
+            )
+            dataset = build_dataset_dict(
+                rows,
+                train_ratio=float(os.getenv("TRAIN_RATIO", "0.8")),
+                validation_ratio=float(os.getenv("VALIDATION_RATIO", "0.1")),
+                seed=seed,
+            )
+        case "hf_disk":
+            hf_dataset_path = os.getenv("HF_DATASET_PATH")
+            if not hf_dataset_path:
+                raise ValueError("HF_DATASET_PATH is required when TRAINING_DATA_SOURCE=hf_disk")
+            dataset = load_from_disk(hf_dataset_path)
+        case "hf_hub":
+            hf_dataset_repo = os.getenv("HF_DATASET_REPO")
+            if not hf_dataset_repo:
+                raise ValueError("HF_DATASET_REPO is required when TRAINING_DATA_SOURCE=hf_hub")
+            dataset = load_dataset(hf_dataset_repo)
+        case _:
+            raise ValueError(
+                "TRAINING_DATA_SOURCE must be one of: mongo, hf_disk, hf_hub"
+            )
+
+    if not isinstance(dataset, DatasetDict):
+        raise ValueError("Expected a Hugging Face DatasetDict with train/validation/test splits")
+
+    required_splits = {"train", "validation", "test"}
+    missing_splits = required_splits.difference(dataset.keys())
+    if missing_splits:
+        raise ValueError(f"Dataset is missing required splits: {sorted(missing_splits)}")
+
+    return dataset
+
+
 def main() -> None:
     seed = int(os.getenv("SEED", "42"))
     torch.manual_seed(seed)
 
-    mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-    mongo_db = os.getenv("MONGO_DB", "sabaq")
-    training_collection = os.getenv("TRAINING_COLLECTION", "training_fr_wiktionary")
-    max_training_rows = os.getenv("MAX_TRAINING_ROWS")
-
-    client = pymongo.MongoClient(mongo_uri)
-    collection = client[mongo_db][training_collection]
-    cursor = collection.find({})
-    if max_training_rows:
-        cursor = cursor.limit(int(max_training_rows))
-
-    rows = []
-    for record in cursor:
-        rows.extend(training_rows_from_record(record))
+    training_data_source = os.getenv("TRAINING_DATA_SOURCE", "mongo")
+    dataset = load_dataset_dict_from_env(training_data_source, seed)
 
     model_name = os.getenv("MODEL_NAME", "camembert/camembert-base-wikipedia-4gb")
     cohesion_model_name = os.getenv("COHESION_MODEL_NAME", model_name)
@@ -48,13 +80,7 @@ def main() -> None:
 
     token_bundle = load_token_classification_bundle(model_name, metric_name=metric_name)
     cohesion_bundle = load_cohesion_model_bundle(cohesion_model_name)
-    tokenized_datasets = build_tokenized_dataset(
-        rows,
-        token_bundle.tokenizer,
-        train_ratio=float(os.getenv("TRAIN_RATIO", "0.8")),
-        validation_ratio=float(os.getenv("VALIDATION_RATIO", "0.1")),
-        seed=seed,
-    )
+    tokenized_datasets = tokenize_dataset_dict(dataset, token_bundle.tokenizer)
 
     translation_config = TranslationMeteorConfig(
         enabled=os.getenv("TRANSLATION_METEOR_ENABLED", "1") == "1",
@@ -112,7 +138,7 @@ def main() -> None:
     finally:
         async_runtime.run(meteor_scorer.close())
         async_runtime.close()
-        client.close()
+
 
 
 if __name__ == "__main__":

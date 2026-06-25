@@ -71,7 +71,18 @@ def build_tokenized_dataset(
         validation_ratio=validation_ratio,
         seed=seed,
     )
+    return tokenize_dataset_dict(
+        dataset,
+        tokenizer,
+        label_all_tokens=label_all_tokens,
+    )
 
+
+def tokenize_dataset_dict(
+    dataset: DatasetDict,
+    tokenizer,
+    label_all_tokens: bool = True,
+) -> DatasetDict:
     def align(examples):
         return tokenize_and_align_labels(
             examples,

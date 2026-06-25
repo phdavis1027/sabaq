@@ -2,6 +2,29 @@ from __future__ import annotations
 
 from typing import Any, Iterable
 
+import pymongo
+
+
+def load_training_rows_from_mongo(
+    mongo_uri: str = "mongodb://localhost:27017",
+    mongo_db: str = "sabaq",
+    training_collection: str = "training_fr_wiktionary",
+    max_training_rows: int | str | None = None,
+) -> list[dict[str, Any]]:
+    client = pymongo.MongoClient(mongo_uri)
+    try:
+        collection = client[mongo_db][training_collection]
+        cursor = collection.find({})
+        if max_training_rows:
+            cursor = cursor.limit(int(max_training_rows))
+
+        rows: list[dict[str, Any]] = []
+        for record in cursor:
+            rows.extend(training_rows_from_record(record))
+        return rows
+    finally:
+        client.close()
+
 
 def training_rows_from_record(record: dict[str, Any]) -> Iterable[dict[str, Any]]:
     yield training_row_from_tokens_and_labels(

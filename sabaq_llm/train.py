@@ -102,8 +102,6 @@ def main() -> None:
                 cohesion_bundle.device,
                 cohesion_config,
             ),
-            translation_config=translation_config,
-            cohesion_config=cohesion_config,
             async_runtime=async_runtime,
         )
 

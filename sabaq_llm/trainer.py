@@ -175,8 +175,6 @@ class IdiomRecognitionTrainer(Trainer):
         idiom_tokenizer,
         meteor_scorer: MeteorScorer,
         cohesion_scorer: CohesionScorer,
-        translation_config: TranslationMeteorConfig,
-        cohesion_config: CohesionConfig,
         async_runtime: AsyncRuntime,
         **kwargs,
     ) -> None:
@@ -184,8 +182,6 @@ class IdiomRecognitionTrainer(Trainer):
         self.idiom_tokenizer = idiom_tokenizer
         self.meteor_scorer = meteor_scorer
         self.cohesion_scorer = cohesion_scorer
-        self.translation_config = translation_config
-        self.cohesion_config = cohesion_config
         self.async_runtime = async_runtime
 
     def compute_loss(
@@ -214,18 +210,20 @@ class IdiomRecognitionTrainer(Trainer):
             )
             sentence = " ".join(context_words)
 
-            if self.translation_config.enabled:
+            meteor_config = self.meteor_scorer.config
+            if meteor_config.enabled:
                 meteor, _, _ = self.async_runtime.run(self.meteor_scorer.score(sentence))
-                if meteor < self.translation_config.meteor_threshold:
-                    penalty *= self.translation_config.penalty_multiplier
+                if meteor < meteor_config.meteor_threshold:
+                    penalty *= meteor_config.penalty_multiplier
 
-            if self.cohesion_config.enabled and idiom_words:
+            cohesion_config = self.cohesion_scorer.config
+            if cohesion_config.enabled and idiom_words:
                 _, connectivity, connectivity_without_idiom = self.cohesion_scorer.calculate(
                     context_words,
                     idiom_words,
                 )
-                if connectivity_without_idiom - connectivity > self.cohesion_config.threshold:
-                    penalty *= self.cohesion_config.penalty_multiplier
+                if connectivity_without_idiom - connectivity > cohesion_config.threshold:
+                    penalty *= cohesion_config.penalty_multiplier
 
         loss = loss * penalty
         return (loss, outputs) if return_outputs else loss

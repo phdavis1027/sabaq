@@ -13,6 +13,8 @@ from transformers import (
 )
 
 
+
+
 @dataclass
 class TokenClassificationBundle:
     model: Any
@@ -31,6 +33,7 @@ class CohesionModelBundle:
 
 def get_device() -> torch.device:
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 
 def load_token_classification_bundle(

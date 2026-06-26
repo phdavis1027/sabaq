@@ -9,6 +9,7 @@ import torch
 from transformers import TrainingArguments
 
 from sabaq_llm.data import build_dataset_dict, tokenize_dataset_dict
+from sabaq_llm.env import env_bool
 from sabaq_llm.model import load_cohesion_model_bundle, load_token_classification_bundle
 from sabaq_llm.mongo import load_training_rows_from_mongo
 from sabaq_llm.trainer import (
@@ -20,13 +21,6 @@ from sabaq_llm.trainer import (
     TranslationMeteorConfig,
     compute_metrics,
 )
-
-
-def env_bool(name: str, default: bool = False) -> bool:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return value.lower() in {"1", "true", "yes", "on"}
 
 
 def load_dataset_dict_from_env(source: str, seed: int) -> DatasetDict:

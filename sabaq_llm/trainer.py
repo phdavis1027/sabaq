@@ -109,6 +109,7 @@ class CohesionScorer:
         self.device = device
         self.config = config
         self.embedding_cache: dict[str, np.ndarray] = {}
+        self.nlp_cache: dict[str, bool] = {}
 
     def calculate(self, context_words: list[str], idiom_words: list[str]):
         filtered_context_words = self._filter_pos(context_words)
@@ -150,13 +151,12 @@ class CohesionScorer:
         return "literal", connectivity, connectivity_without_idiom
 
     def _filter_pos(self, words: list[str]) -> list[str]:
-        filtered_words = []
-        for word in words:
-            for token in self.nlp(word):
-                if token.pos_ in self.config.pos_tags_to_keep:
-                    filtered_words.append(word)
-                    break
-        return filtered_words
+        missing = [word for word in dict.fromkeys(words) if word not in self.nlp_cache]
+        for word, doc in zip(missing, self.nlp.pipe(missing)):
+            self.nlp_cache[word] = any(
+                token.pos_ in self.config.pos_tags_to_keep for token in doc
+            )
+        return [word for word in words if self.nlp_cache[word]]
 
     def _cohesion_graph(self, words: list[str]) -> np.ndarray:
         embeddings = np.stack([self._embedding(word) for word in words])

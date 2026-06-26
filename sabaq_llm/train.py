@@ -184,7 +184,7 @@ def main() -> None:
             cohesion_scorer=CohesionScorer(
                 cohesion_bundle.model,
                 cohesion_bundle.tokenizer,
-                spacy.load(spacy_model),
+                spacy.load(spacy_model, disable=["parser", "ner"]),
                 cohesion_bundle.device,
                 cohesion_config,
             ),

@@ -113,21 +113,34 @@ class CohesionScorer:
 
     def calculate(self, context_words: list[str], idiom_words: list[str]):
         filtered_context_words = self._filter_pos(context_words)
-        if not filtered_context_words:
-            filtered_context_words = context_words
-        if not filtered_context_words:
-            return "idiom", 0.0, 0.0
+        result = self._calculate_for_words(filtered_context_words, idiom_words)
+        if result is not None:
+            return result
 
-        cohesion_graph = self._cohesion_graph(filtered_context_words)
+        result = self._calculate_for_words(context_words, idiom_words)
+        if result is not None:
+            return result
+
+        return "idiom", 0.0, 0.0
+
+    def _calculate_for_words(
+        self,
+        context_words: list[str],
+        idiom_words: list[str],
+    ) -> tuple[str, float, float] | None:
+        if not context_words:
+            return None
+
+        cohesion_graph = self._cohesion_graph(context_words)
         connectivity = float(np.mean(cohesion_graph))
         idiom_indices = [
-            filtered_context_words.index(word)
+            context_words.index(word)
             for word in idiom_words
-            if word in filtered_context_words
+            if word in context_words
         ]
 
         if not idiom_indices:
-            return "idiom", 0.0, 0.0
+            return None
 
         cohesion_graph = np.delete(cohesion_graph, idiom_indices, axis=0)
         cohesion_graph = np.delete(cohesion_graph, idiom_indices, axis=1)
@@ -201,7 +214,8 @@ class IdiomRecognitionTrainer(Trainer):
             ignore_index=-100,
         )
 
-        penalty = 1.0
+        meteor_penalty_applies = False
+        cohesion_penalty_applies = False
         for sample_input_ids, sample_labels in zip(input_ids, labels):
             context_words, idiom_words = idiom_part(
                 sample_input_ids,
@@ -214,7 +228,7 @@ class IdiomRecognitionTrainer(Trainer):
             if meteor_config.enabled:
                 meteor, _, _ = self.async_runtime.run(self.meteor_scorer.score(sentence))
                 if meteor < meteor_config.meteor_threshold:
-                    penalty *= meteor_config.penalty_multiplier
+                    meteor_penalty_applies = True
 
             cohesion_config = self.cohesion_scorer.config
             if cohesion_config.enabled and idiom_words:
@@ -223,9 +237,15 @@ class IdiomRecognitionTrainer(Trainer):
                     idiom_words,
                 )
                 if connectivity_without_idiom - connectivity > cohesion_config.threshold:
-                    penalty *= cohesion_config.penalty_multiplier
+                    cohesion_penalty_applies = True
 
-        loss = loss * penalty
+        meteor_config = self.meteor_scorer.config
+        if meteor_penalty_applies:
+            loss = loss * meteor_config.penalty_multiplier
+
+        cohesion_config = self.cohesion_scorer.config
+        if cohesion_penalty_applies:
+            loss = loss * cohesion_config.penalty_multiplier
         return (loss, outputs) if return_outputs else loss
 
 

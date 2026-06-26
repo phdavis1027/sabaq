@@ -10,7 +10,6 @@ import nltk
 from nltk.translate import meteor_score
 import numpy as np
 from sklearn.metrics import classification_report
-from sklearn.metrics.pairwise import cosine_similarity
 import torch
 from transformers import Trainer
 
@@ -160,15 +159,11 @@ class CohesionScorer:
         return filtered_words
 
     def _cohesion_graph(self, words: list[str]) -> np.ndarray:
-        embeddings = {word: self._embedding(word) for word in words}
-        graph = np.zeros((len(words), len(words)))
-        for i, word1 in enumerate(words):
-            for j, word2 in enumerate(words):
-                graph[i, j] = cosine_similarity(
-                    [embeddings[word1]],
-                    [embeddings[word2]],
-                )[0, 0]
-        return graph
+        embeddings = np.stack([self._embedding(word) for word in words])
+        norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+        norms[norms == 0.0] = 1.0
+        normalized = embeddings / norms
+        return normalized @ normalized.T
 
     def _embedding(self, text: str) -> np.ndarray:
         if text in self.embedding_cache:

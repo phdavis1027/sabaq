@@ -212,38 +212,38 @@ class IdiomRecognitionTrainer(Trainer):
             ignore_index=-100,
         )
 
-        meteor_penalty_applies = False
-        cohesion_penalty_applies = False
-        sentences: list[str] = []
-        for sample_input_ids, sample_labels in zip(input_ids, labels):
-            context_words, idiom_words = idiom_part(
-                sample_input_ids,
-                sample_labels,
-                self.idiom_tokenizer,
-            )
-            sentences.append(" ".join(context_words))
-
-            cohesion_config = self.cohesion_scorer.config
-            if cohesion_config.enabled and idiom_words:
-                _, connectivity, connectivity_without_idiom = self.cohesion_scorer.calculate(
-                    context_words,
-                    idiom_words,
+        if model.training:
+            meteor_penalty_applies = False
+            cohesion_penalty_applies = False
+            sentences: list[str] = []
+            for sample_input_ids, sample_labels in zip(input_ids, labels):
+                context_words, idiom_words = idiom_part(
+                    sample_input_ids,
+                    sample_labels,
+                    self.idiom_tokenizer,
                 )
-                if connectivity_without_idiom - connectivity > cohesion_config.threshold:
-                    cohesion_penalty_applies = True
+                sentences.append(" ".join(context_words))
 
-        meteor_config = self.meteor_scorer.config
-        if meteor_config.enabled:
-            scores = self.meteor_scorer.score_batch(sentences)
-            if any(value < meteor_config.meteor_threshold for value in scores):
-                meteor_penalty_applies = True
+                cohesion_config = self.cohesion_scorer.config
+                if cohesion_config.enabled and idiom_words:
+                    _, connectivity, connectivity_without_idiom = self.cohesion_scorer.calculate(
+                        context_words,
+                        idiom_words,
+                    )
+                    if connectivity_without_idiom - connectivity > cohesion_config.threshold:
+                        cohesion_penalty_applies = True
 
-        if meteor_penalty_applies:
-            loss = loss * meteor_config.penalty_multiplier
+            meteor_config = self.meteor_scorer.config
+            if meteor_config.enabled:
+                scores = self.meteor_scorer.score_batch(sentences)
+                if any(value < meteor_config.meteor_threshold for value in scores):
+                    meteor_penalty_applies = True
 
-        cohesion_config = self.cohesion_scorer.config
-        if cohesion_penalty_applies:
-            loss = loss * cohesion_config.penalty_multiplier
+            if meteor_penalty_applies:
+                loss = loss * meteor_config.penalty_multiplier
+
+            if cohesion_penalty_applies:
+                loss = loss * cohesion_config.penalty_multiplier
         return (loss, outputs) if return_outputs else loss
 
 

@@ -260,6 +260,20 @@ def idiom_part(input_ids, labels, tokenizer) -> tuple[list[str], list[str]]:
     return context, idiom
 
 
+def _to_bio(tags: list[str]) -> list[str]:
+    bio = []
+    previous = "O"
+    for tag in tags:
+        if tag == "O":
+            bio.append("O")
+        elif previous == "IDIOM":
+            bio.append("I-IDIOM")
+        else:
+            bio.append("B-IDIOM")
+        previous = tag
+    return bio
+
+
 def compute_metrics(eval_preds, metric: Any) -> dict[str, float]:
     pred_logits, labels = eval_preds
     pred_logits = np.argmax(pred_logits, axis=2)
@@ -277,7 +291,10 @@ def compute_metrics(eval_preds, metric: Any) -> dict[str, float]:
     flat_true_labels = [label for row in true_labels for label in row]
     print(classification_report(flat_true_labels, flat_predictions, digits=4))
 
-    results = metric.compute(predictions=predictions, references=true_labels)
+    results = metric.compute(
+        predictions=[_to_bio(row) for row in predictions],
+        references=[_to_bio(row) for row in true_labels],
+    )
     return {
         "precision": results["overall_precision"],
         "recall": results["overall_recall"],

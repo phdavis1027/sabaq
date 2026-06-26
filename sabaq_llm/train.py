@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import os
+import re
 
 from datasets import DatasetDict, load_dataset, load_from_disk
 import spacy
@@ -10,10 +11,13 @@ from transformers import TrainingArguments
 
 from sabaq_llm.data import build_dataset_dict, tokenize_dataset_dict
 from sabaq_llm.env import env_bool
-from sabaq_llm.model import load_cohesion_model_bundle, load_token_classification_bundle
+from sabaq_llm.model import (
+    load_cohesion_model_bundle,
+    load_token_classification_bundle,
+    load_translation_model_bundle,
+)
 from sabaq_llm.mongo import load_training_rows_from_mongo
 from sabaq_llm.trainer import (
-    AsyncRuntime,
     CohesionConfig,
     CohesionScorer,
     IdiomRecognitionTrainer,
@@ -116,12 +120,14 @@ def main() -> None:
 
     model_name = os.getenv("MODEL_NAME", "camembert/camembert-base-wikipedia-4gb")
     cohesion_model_name = os.getenv("COHESION_MODEL_NAME", model_name)
+    translation_model_name = os.getenv("TRANSLATION_MODEL_NAME", "facebook/nllb-200-distilled-600M")
     metric_name = os.getenv("METRIC_NAME", "seqeval")
     spacy_model = os.getenv("SPACY_MODEL", "fr_dep_news_trf")
     output_dir = os.getenv("OUTPUT_DIR", "runs/idiom-recognition")
 
     token_bundle = load_token_classification_bundle(model_name, metric_name=metric_name)
     cohesion_bundle = load_cohesion_model_bundle(cohesion_model_name)
+    translation_bundle = load_translation_model_bundle(translation_model_name)
     tokenized_datasets = tokenize_dataset_dict(dataset, token_bundle.tokenizer)
 
     train_batch_size = int(os.getenv("TRAIN_BATCH_SIZE", "1"))
@@ -143,8 +149,7 @@ def main() -> None:
         pivot_language=os.getenv("PIVOT_LANGUAGE", "hi"),
         meteor_threshold=float(os.getenv("METEOR_THRESHOLD", "0.7")),
         penalty_multiplier=float(os.getenv("OBJECTIVE_PENALTY_MULTIPLIER", "100")),
-        max_retries=int(os.getenv("TRANSLATION_MAX_RETRIES", "3")),
-        timeout_seconds=int(os.getenv("TRANSLATION_TIMEOUT_SECONDS", "10")),
+        max_input_tokens=int(os.getenv("TRANSLATION_MAX_INPUT_TOKENS", "256")),
     )
     cohesion_config = CohesionConfig(
         enabled=os.getenv("COHESION_ENABLED", "1") == "1",
@@ -168,36 +173,42 @@ def main() -> None:
         seed=seed,
     )
 
-    async_runtime = AsyncRuntime()
-    meteor_scorer = MeteorScorer(translation_config)
-    try:
-        trainer = IdiomRecognitionTrainer(
-            model=token_bundle.model,
-            args=training_args,
-            train_dataset=tokenized_datasets["train"],
-            eval_dataset=tokenized_datasets["validation"],
-            data_collator=token_bundle.data_collator,
-            processing_class=token_bundle.tokenizer,
-            compute_metrics=lambda preds: compute_metrics(preds, token_bundle.metric),
-            idiom_tokenizer=token_bundle.tokenizer,
-            meteor_scorer=meteor_scorer,
-            cohesion_scorer=CohesionScorer(
-                cohesion_bundle.model,
-                cohesion_bundle.tokenizer,
-                spacy.load(spacy_model, disable=["parser", "ner"]),
-                cohesion_bundle.device,
-                cohesion_config,
-            ),
-            async_runtime=async_runtime,
-        )
+    cache_slug = re.sub(r"[^0-9A-Za-z._-]", "-", translation_model_name)
+    meteor_cache_path = os.getenv(
+        "METEOR_CACHE_PATH",
+        f"runs/meteor_cache/{cache_slug}_{translation_config.source_language}"
+        f"_{translation_config.pivot_language}.jsonl",
+    )
+    meteor_scorer = MeteorScorer(
+        translation_bundle.model,
+        translation_bundle.tokenizer,
+        translation_bundle.device,
+        translation_config,
+        cache_path=meteor_cache_path,
+    )
+    trainer = IdiomRecognitionTrainer(
+        model=token_bundle.model,
+        args=training_args,
+        train_dataset=tokenized_datasets["train"],
+        eval_dataset=tokenized_datasets["validation"],
+        data_collator=token_bundle.data_collator,
+        processing_class=token_bundle.tokenizer,
+        compute_metrics=lambda preds: compute_metrics(preds, token_bundle.metric),
+        idiom_tokenizer=token_bundle.tokenizer,
+        meteor_scorer=meteor_scorer,
+        cohesion_scorer=CohesionScorer(
+            cohesion_bundle.model,
+            cohesion_bundle.tokenizer,
+            spacy.load(spacy_model, disable=["parser", "ner"]),
+            cohesion_bundle.device,
+            cohesion_config,
+        ),
+    )
 
-        trainer.train()
-        trainer.eval_dataset = tokenized_datasets["test"]
-        trainer.evaluate()
-        trainer.save_model(output_dir)
-    finally:
-        async_runtime.run(meteor_scorer.close())
-        async_runtime.close()
+    trainer.train()
+    trainer.eval_dataset = tokenized_datasets["test"]
+    trainer.evaluate()
+    trainer.save_model(output_dir)
 
 
 

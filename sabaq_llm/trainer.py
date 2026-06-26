@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import asyncio
+import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
-from googletrans import Translator
-import httpx
 import nltk
 from nltk.translate import meteor_score
 import numpy as np
@@ -24,8 +23,7 @@ class TranslationMeteorConfig:
     pivot_language: str = "hi"
     meteor_threshold: float = 0.7
     penalty_multiplier: float = 100.0
-    max_retries: int = 3
-    timeout_seconds: int = 10
+    max_input_tokens: int = 256
 
 
 @dataclass
@@ -36,69 +34,76 @@ class CohesionConfig:
     penalty_multiplier: float = 100.0
 
 
-class AsyncRuntime:
-    def __init__(self) -> None:
-        self.loop = asyncio.new_event_loop()
-        self._closed = False
-
-    def run(self, awaitable):
-        if self._closed:
-            raise RuntimeError("Async runtime is closed")
-        return self.loop.run_until_complete(awaitable)
-
-    def close(self) -> None:
-        if self._closed:
-            return
-        self._closed = True
-        self.loop.run_until_complete(self.loop.shutdown_asyncgens())
-        self.loop.close()
+NLLB_LANG_CODES = {"fr": "fra_Latn", "hi": "hin_Deva"}
 
 
 class MeteorScorer:
-    def __init__(self, config: TranslationMeteorConfig) -> None:
+    def __init__(
+        self,
+        model,
+        tokenizer,
+        device,
+        config: TranslationMeteorConfig,
+        cache_path: str | None = None,
+    ) -> None:
+        self.model = model
+        self.tokenizer = tokenizer
+        self.device = device
         self.config = config
-        self.translator = Translator(
-            timeout=httpx.Timeout(float(config.timeout_seconds)),
-        )
-        self.cache: dict[str, tuple[float, str, str]] = {}
+        self.cache: dict[str, float] = {}
+        self.cache_path = Path(cache_path) if cache_path else None
+        self._load_cache()
         nltk.download("wordnet", quiet=True)
 
-    async def score(self, text: str) -> tuple[float, str, str]:
-        if text in self.cache:
-            return self.cache[text]
+    def _load_cache(self) -> None:
+        if not self.cache_path or not self.cache_path.exists():
+            return
+        with self.cache_path.open() as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                entry = json.loads(line)
+                self.cache[entry["text"]] = entry["score"]
 
-        last_exception: Exception | None = None
-        for retry in range(self.config.max_retries):
-            try:
-                translated = await self._translate(
-                    text,
-                    src=self.config.source_language,
-                    dest=self.config.pivot_language,
-                )
-                backtranslated = await self._translate(
-                    translated,
-                    src=self.config.pivot_language,
-                    dest=self.config.source_language,
-                )
-                value = meteor_score.meteor_score([text.split()], backtranslated.split())
-                self.cache[text] = (value, text, backtranslated)
-                return self.cache[text]
-            except Exception as exc:
-                last_exception = exc
-                print(f"Translation failed on retry {retry + 1}: {exc}")
-                await asyncio.sleep(1)
+    def _persist(self, text: str, score: float) -> None:
+        if not self.cache_path:
+            return
+        self.cache_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.cache_path.open("a") as handle:
+            handle.write(json.dumps({"text": text, "score": score}) + "\n")
 
-        raise RuntimeError(
-            "METEOR backtranslation failed after "
-            f"{self.config.max_retries} retries for text: {text!r}"
-        ) from last_exception
+    def score_batch(self, texts: list[str]) -> list[float]:
+        missing = [text for text in dict.fromkeys(texts) if text not in self.cache]
+        if missing:
+            pivots = self._translate(
+                missing, self.config.source_language, self.config.pivot_language
+            )
+            backtranslated = self._translate(
+                pivots, self.config.pivot_language, self.config.source_language
+            )
+            for text, back in zip(missing, backtranslated):
+                score = meteor_score.meteor_score([text.split()], back.split())
+                self.cache[text] = score
+                self._persist(text, score)
+        return [self.cache[text] for text in texts]
 
-    async def close(self) -> None:
-        await self.translator.client.aclose()
-
-    async def _translate(self, text: str, src: str, dest: str) -> str:
-        result = await self.translator.translate(text, src=src, dest=dest)
-        return result.text
+    def _translate(self, texts: list[str], src: str, dest: str) -> list[str]:
+        self.tokenizer.src_lang = NLLB_LANG_CODES[src]
+        inputs = self.tokenizer(
+            texts,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=self.config.max_input_tokens,
+        ).to(self.device)
+        with torch.no_grad():
+            generated = self.model.generate(
+                **inputs,
+                forced_bos_token_id=self.tokenizer.convert_tokens_to_ids(NLLB_LANG_CODES[dest]),
+                max_length=self.config.max_input_tokens,
+            )
+        return self.tokenizer.batch_decode(generated, skip_special_tokens=True)
 
 
 class CohesionScorer:
@@ -183,14 +188,12 @@ class IdiomRecognitionTrainer(Trainer):
         idiom_tokenizer,
         meteor_scorer: MeteorScorer,
         cohesion_scorer: CohesionScorer,
-        async_runtime: AsyncRuntime,
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
         self.idiom_tokenizer = idiom_tokenizer
         self.meteor_scorer = meteor_scorer
         self.cohesion_scorer = cohesion_scorer
-        self.async_runtime = async_runtime
 
     def compute_loss(
         self,
@@ -211,19 +214,14 @@ class IdiomRecognitionTrainer(Trainer):
 
         meteor_penalty_applies = False
         cohesion_penalty_applies = False
+        sentences: list[str] = []
         for sample_input_ids, sample_labels in zip(input_ids, labels):
             context_words, idiom_words = idiom_part(
                 sample_input_ids,
                 sample_labels,
                 self.idiom_tokenizer,
             )
-            sentence = " ".join(context_words)
-
-            meteor_config = self.meteor_scorer.config
-            if meteor_config.enabled:
-                meteor, _, _ = self.async_runtime.run(self.meteor_scorer.score(sentence))
-                if meteor < meteor_config.meteor_threshold:
-                    meteor_penalty_applies = True
+            sentences.append(" ".join(context_words))
 
             cohesion_config = self.cohesion_scorer.config
             if cohesion_config.enabled and idiom_words:
@@ -235,6 +233,11 @@ class IdiomRecognitionTrainer(Trainer):
                     cohesion_penalty_applies = True
 
         meteor_config = self.meteor_scorer.config
+        if meteor_config.enabled:
+            scores = self.meteor_scorer.score_batch(sentences)
+            if any(value < meteor_config.meteor_threshold for value in scores):
+                meteor_penalty_applies = True
+
         if meteor_penalty_applies:
             loss = loss * meteor_config.penalty_multiplier
 

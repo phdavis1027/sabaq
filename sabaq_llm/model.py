@@ -7,6 +7,7 @@ import datasets
 import torch
 from transformers import (
     AutoModel,
+    AutoModelForSeq2SeqLM,
     AutoModelForTokenClassification,
     AutoTokenizer,
     DataCollatorForTokenClassification,
@@ -26,6 +27,13 @@ class TokenClassificationBundle:
 
 @dataclass
 class CohesionModelBundle:
+    model: Any
+    tokenizer: Any
+    device: torch.device
+
+
+@dataclass
+class TranslationModelBundle:
     model: Any
     tokenizer: Any
     device: torch.device
@@ -63,3 +71,12 @@ def load_cohesion_model_bundle(model_name: str) -> CohesionModelBundle:
     model = AutoModel.from_pretrained(model_name)
     model.to(device)
     return CohesionModelBundle(model=model, tokenizer=tokenizer, device=device)
+
+
+def load_translation_model_bundle(model_name: str) -> TranslationModelBundle:
+    device = get_device()
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+    model.to(device)
+    model.eval()
+    return TranslationModelBundle(model=model, tokenizer=tokenizer, device=device)
